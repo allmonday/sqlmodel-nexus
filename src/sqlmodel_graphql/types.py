@@ -32,6 +32,10 @@ class RelationshipSelection:
     fields: list[FieldSelection] = field(default_factory=list)
     relationships: dict[str, RelationshipSelection] = field(default_factory=dict)
 
+    def get_field_names(self) -> list[str]:
+        """Get list of field names without aliases."""
+        return [f.name for f in self.fields]
+
 
 @dataclass
 class QueryMeta:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy.orm import load_only, selectinload
+from sqlalchemy.orm import class_mapper, load_only, selectinload
 from sqlmodel import select
 
 if TYPE_CHECKING:
@@ -160,9 +160,19 @@ class QueryBuilder:
         target = entity or self.entity
         pk_columns: list[Any] = []
 
-        # SQLModel stores primary key info in model_fields
-        for field_name, field_info in target.model_fields.items():
-            if field_info.primary_key:
-                pk_columns.append(getattr(target, field_name))
+        # Use SQLAlchemy mapper to get primary key columns
+        try:
+            mapper = class_mapper(target)
+            for pk_column in mapper.primary_key:
+                # Get the column name and find the corresponding model attribute
+                pk_columns.append(getattr(target, pk_column.key))
+        except Exception:
+            # Fallback: try to find primary key from model_fields metadata
+            for field_name, field_info in target.model_fields.items():
+                # Check if this field has primary_key in json_schema_extra or other metadata
+                json_schema_extra = field_info.json_schema_extra
+                if json_schema_extra and isinstance(json_schema_extra, dict):
+                    if json_schema_extra.get("primary_key"):
+                        pk_columns.append(getattr(target, field_name))
 
         return pk_columns
