@@ -86,13 +86,13 @@ class TestSDLGenerator:
         assert "type Mutation" in sdl
         assert "createUser(name: String!, email: String!): UserForTest!" in sdl
 
-    def test_camel_case_conversion(self) -> None:
-        """Test that snake_case is converted to camelCase."""
+    def test_snake_case_preserved(self) -> None:
+        """Test that snake_case field names are preserved (no conversion to camelCase)."""
         generator = SDLGenerator([PostForTest])
         sdl = generator.generate()
 
-        # author_id should become authorId
-        assert "authorId: Int!" in sdl
+        # author_id should remain as snake_case
+        assert "author_id: Int!" in sdl
 
     def test_query_meta_not_in_sdl(self) -> None:
         """Test that query_meta parameter is not included in SDL."""

@@ -12,12 +12,6 @@ if TYPE_CHECKING:
     pass
 
 
-def _to_camel_case(name: str) -> str:
-    """Convert snake_case to camelCase."""
-    components = name.split("_")
-    return components[0] + "".join(x.title() for x in components[1:])
-
-
 def _is_optional(type_hint: Any) -> bool:
     """Check if a type hint is Optional (Union with None)."""
     origin = get_origin(type_hint)
@@ -145,8 +139,7 @@ class SDLGenerator:
         # Get scalar fields from model_fields
         for field_name, field_info in entity.model_fields.items():
             gql_type = self._field_info_to_graphql(field_info)
-            camel_name = _to_camel_case(field_name)
-            fields.append(f"  {camel_name}: {gql_type}")
+            fields.append(f"  {field_name}: {gql_type}")
 
         # Get relationship fields from type hints
         hints = get_type_hints(entity)
@@ -157,8 +150,7 @@ class SDLGenerator:
             # Check if it's a relationship (references another entity)
             gql_type = self._type_hint_to_graphql(hint)
             if gql_type:
-                camel_name = _to_camel_case(field_name)
-                fields.append(f"  {camel_name}: {gql_type}")
+                fields.append(f"  {field_name}: {gql_type}")
 
         return f"type {entity.__name__} {{\n{chr(10).join(fields)}\n}}"
 
@@ -231,7 +223,7 @@ class SDLGenerator:
             func, "_graphql_mutation_name", None
         )
         if gql_name is None:
-            gql_name = _to_camel_case(func.__name__)
+            gql_name = func.__name__
 
         # Get description
         description = getattr(func, "_graphql_query_description", None) or getattr(
@@ -258,9 +250,9 @@ class SDLGenerator:
                 if param.default != inspect.Parameter.empty:
                     # Remove the ! for optional parameters
                     gql_type = gql_type.rstrip("!")
-                params.append(f"{_to_camel_case(param_name)}: {gql_type}")
+                params.append(f"{param_name}: {gql_type}")
             else:
-                params.append(f"{_to_camel_case(param_name)}: String!")
+                params.append(f"{param_name}: String!")
 
         # Get return type
         return_type = hints.get("return", inspect.Signature.empty)

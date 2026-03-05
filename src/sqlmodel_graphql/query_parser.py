@@ -1,5 +1,6 @@
 """GraphQL query parser for extracting QueryMeta from selection sets."""
 
+
 from __future__ import annotations
 
 from typing import Any
@@ -7,6 +8,7 @@ from typing import Any
 from graphql import FieldNode, OperationDefinitionNode, parse
 
 from sqlmodel_graphql.types import FieldSelection, QueryMeta, RelationshipSelection
+
 
 
 class QueryParser:

@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING, List, Optional
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, Relationship, SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from sqlmodel_graphql import QueryBuilder, QueryParser
+from sqlmodel_graphql import QueryParser
 from sqlmodel_graphql.types import FieldSelection, QueryMeta, RelationshipSelection
 
 if TYPE_CHECKING:
@@ -114,34 +114,28 @@ class TestQueryParser:
         assert result["users"].relationships["posts"].get_field_names() == ["title"]
 
 
-class TestQueryBuilderIntegration:
-    """Test QueryBuilder with real SQLite database."""
+class TestQueryMetaIntegration:
+    """Test QueryMeta.to_options() with real SQLite database."""
 
     @pytest.mark.asyncio
-    async def test_load_only_optimization(self, session, sample_data) -> None:
-        """Test that load_only only loads requested fields."""
-        # Create QueryMeta with only 'name' field
+    async def test_to_options_field_selection(self, session, sample_data) -> None:
+        """Test to_options with field selection only."""
         query_meta = QueryMeta(
             fields=[FieldSelection(name="name")],
             relationships={},
         )
 
-        # Build optimized query
-        builder = QueryBuilder(User)
-        stmt = builder.build(query_meta)
-
-        # Execute query
+        # Use to_options API
+        stmt = select(User).options(*query_meta.to_options(User))
         result = await session.exec(stmt)
         users = result.all()
 
         assert len(users) == 2
-        # Verify we got the data
         assert users[0].name in ["Alice", "Bob"]
 
     @pytest.mark.asyncio
-    async def test_selectinload_relationships(self, session, sample_data) -> None:
-        """Test that selectinload eagerly loads relationships."""
-        # Create QueryMeta with relationship
+    async def test_to_options_with_relationships(self, session, sample_data) -> None:
+        """Test to_options with relationships."""
         query_meta = QueryMeta(
             fields=[FieldSelection(name="id"), FieldSelection(name="name")],
             relationships={
@@ -153,16 +147,12 @@ class TestQueryBuilderIntegration:
             },
         )
 
-        # Build optimized query
-        builder = QueryBuilder(User)
-        stmt = builder.build(query_meta)
-
-        # Execute query
+        # Use to_options API
+        stmt = select(User).options(*query_meta.to_options(User))
         result = await session.exec(stmt)
         users = result.all()
 
         assert len(users) == 2
-        # Verify posts are loaded (no lazy load issue)
         for user in users:
             if user.name == "Alice":
                 assert len(user.posts) == 2
@@ -170,8 +160,30 @@ class TestQueryBuilderIntegration:
                 assert len(user.posts) == 1
 
     @pytest.mark.asyncio
+    async def test_to_options_in_query_method(self, session, sample_data) -> None:
+        """Test using to_options in a @query decorated method."""
+        # Simulate usage within a @query decorated method
+        async def get_users(
+            session: AsyncSession,
+            query_meta: Optional[QueryMeta] = None
+        ) -> list[User]:
+            stmt = select(User)
+            if query_meta:
+                stmt = stmt.options(*query_meta.to_options(User))
+            result = await session.exec(stmt)
+            return list(result.all())
+
+        query_meta = QueryMeta(
+            fields=[FieldSelection(name="name")],
+            relationships={},
+        )
+
+        users = await get_users(session, query_meta)
+        assert len(users) == 2
+
+    @pytest.mark.asyncio
     async def test_full_flow_with_parser(self, session, sample_data) -> None:
-        """Test full flow: parse GraphQL -> build query -> execute."""
+        """Test full flow: parse GraphQL -> to_options -> execute."""
         # Parse GraphQL query
         parser = QueryParser(entity_field_names={"id", "name", "email", "posts"})
         graphql_query = """
@@ -188,9 +200,8 @@ class TestQueryBuilderIntegration:
         query_meta_dict = parser.parse(graphql_query)
         query_meta = query_meta_dict["users"]
 
-        # Build optimized query
-        builder = QueryBuilder(User)
-        stmt = builder.build(query_meta)
+        # Build optimized query using to_options
+        stmt = select(User).options(*query_meta.to_options(User))
 
         # Execute
         result = await session.exec(stmt)
