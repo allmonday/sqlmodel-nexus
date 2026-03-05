@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import inspect
+from collections.abc import Callable
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, get_type_hints
+from typing import TYPE_CHECKING, Any, get_type_hints
 
 from sqlmodel_graphql.type_converter import TypeConverter
 
@@ -44,9 +45,14 @@ class IntrospectionGenerator:
         """Generate complete __schema introspection data."""
         types_list = self._get_all_types()
 
+        query_type = {"name": "Query", "kind": "OBJECT"} if self._query_methods else None
+        mutation_type = (
+            {"name": "Mutation", "kind": "OBJECT"} if self._mutation_methods else None
+        )
+
         return {
-            "queryType": {"name": "Query", "kind": "OBJECT"} if self._query_methods else None,
-            "mutationType": {"name": "Mutation", "kind": "OBJECT"} if self._mutation_methods else None,
+            "queryType": query_type,
+            "mutationType": mutation_type,
             "subscriptionType": None,
             "types": types_list,
             "directives": [],
@@ -178,7 +184,7 @@ class IntrospectionGenerator:
         """Build introspection data for the Query type."""
         fields: list[dict] = []
 
-        for field_name, (entity, method) in self._query_methods.items():
+        for field_name, (_entity, method) in self._query_methods.items():
             field = self._build_method_field(field_name, method)
             fields.append(field)
 
@@ -197,7 +203,7 @@ class IntrospectionGenerator:
         """Build introspection data for the Mutation type."""
         fields: list[dict] = []
 
-        for field_name, (entity, method) in self._mutation_methods.items():
+        for field_name, (_entity, method) in self._mutation_methods.items():
             field = self._build_method_field(field_name, method)
             fields.append(field)
 
@@ -241,7 +247,9 @@ class IntrospectionGenerator:
 
             type_hint = hints.get(param_name)
             required = param.default == inspect.Parameter.empty
-            arg = self._build_input_value(param_name, type_hint, default_value=None, required=required)
+            arg = self._build_input_value(
+                param_name, type_hint, default_value=None, required=required
+            )
             args.append(arg)
 
         return {

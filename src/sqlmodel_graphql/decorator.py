@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Callable, Optional, Union, overload
+from collections.abc import Callable
+from typing import overload
 
 
 @overload
@@ -10,15 +11,17 @@ def query(func: Callable) -> classmethod: ...
 
 
 @overload
-def query(*, name: Optional[str] = None, description: Optional[str] = None) -> Callable[[Callable], classmethod]: ...
+def query(
+    *, name: str | None = None, description: str | None = None
+) -> Callable[[Callable], classmethod]: ...
 
 
 def query(
-    name_or_func: Union[Callable, None] = None,
+    name_or_func: Callable | None = None,
     *,
-    name: Optional[str] = None,
-    description: Optional[str] = None,
-) -> Union[classmethod, Callable[[Callable], classmethod]]:
+    name: str | None = None,
+    description: str | None = None,
+) -> classmethod | Callable[[Callable], classmethod]:
     """Mark a method as a GraphQL query.
 
     This decorator automatically converts the method to a classmethod.
@@ -77,15 +80,17 @@ def mutation(func: Callable) -> classmethod: ...
 
 
 @overload
-def mutation(*, name: Optional[str] = None, description: Optional[str] = None) -> Callable[[Callable], classmethod]: ...
+def mutation(
+    *, name: str | None = None, description: str | None = None
+) -> Callable[[Callable], classmethod]: ...
 
 
 def mutation(
-    name_or_func: Union[Callable, None] = None,
+    name_or_func: Callable | None = None,
     *,
-    name: Optional[str] = None,
-    description: Optional[str] = None,
-) -> Union[classmethod, Callable[[Callable], classmethod]]:
+    name: str | None = None,
+    description: str | None = None,
+) -> classmethod | Callable[[Callable], classmethod]:
     """Mark a method as a GraphQL mutation.
 
     This decorator automatically converts the method to a classmethod.

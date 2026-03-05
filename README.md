@@ -118,17 +118,33 @@ result = await handler.execute("""
     name
     posts {
       title
+      comments {
+        content
+        author {
+          name
+        }
+      }
     }
   }
 }
 """)
 
-# Result:
+# Result includes nested relationships automatically:
 # {
 #   "data": {
 #     "users": [
-#       {"id": 1, "name": "Alice", "posts": [{"title": "Hello World"}]},
-#       {"id": 2, "name": "Bob", "posts": [{"title": "GraphQL is Great"}]}
+#       {
+#         "id": 1,
+#         "name": "Alice",
+#         "posts": [
+#           {
+#             "title": "Hello World",
+#             "comments": [
+#               {"content": "Great post!", "author": {"name": "Bob"}}
+#             ]
+#           }
+#         ]
+#       }
 #     ]
 #   }
 # }
@@ -197,14 +213,28 @@ generator = SDLGenerator([User, Post])
 sdl = generator.generate()
 ```
 
-### `GraphQLHandler(entities)`
+### `GraphQLHandler(entities=None, base=None)`
 
-Execute GraphQL queries against SQLModel entities.
+Execute GraphQL queries against SQLModel entities with auto-discovery support.
 
 ```python
+# Auto-discover from SQLModel (default)
+handler = GraphQLHandler()
+
+# Use custom base class
+handler = GraphQLHandler(base=MyBase)
+
+# Explicit entities
 handler = GraphQLHandler(entities=[User, Post])
+
 result = await handler.execute("{ users { id name } }")
 ```
+
+**Auto-Discovery Features:**
+- Automatically finds all SQLModel subclasses with `@query/@mutation` decorators
+- Includes all related entities through Relationship fields
+- Supports custom base classes for better organization
+- Recursive discovery of nested relationships
 
 ### `QueryParser()`
 

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import inspect
-from typing import TYPE_CHECKING, Any, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from graphql import parse
 
@@ -82,9 +83,17 @@ def _serialize_value(
     if isinstance(value, dict):
         if include:
             if isinstance(include, dict):
-                return {k: _serialize_value(v, include.get(k)) for k, v in value.items() if k in include}
+                return {
+                    k: _serialize_value(v, include.get(k))
+                    for k, v in value.items()
+                    if k in include
+                }
             else:
-                return {k: _serialize_value(v) for k, v in value.items() if k in include}
+                return {
+                    k: _serialize_value(v)
+                    for k, v in value.items()
+                    if k in include
+                }
         return {k: _serialize_value(v) for k, v in value.items()}
 
     # Basic types (int, str, bool, float)
@@ -240,7 +249,7 @@ class GraphQLHandler:
         Returns:
             Query result dictionary.
         """
-        from graphql import FieldNode, OperationDefinitionNode, parse
+        from graphql import FieldNode, OperationDefinitionNode
 
         document = parse(query)
         data: dict[str, Any] = {}
@@ -262,9 +271,11 @@ class GraphQLHandler:
                                 method_info = self._mutation_methods.get(field_name)
 
                             if method_info is None:
+                                op_name = op_type.title()
+                                msg = f"Cannot query field '{field_name}' on type '{op_name}'"
                                 errors.append(
                                     {
-                                        "message": f"Cannot query field '{field_name}' on type '{op_type.title()}'",
+                                        "message": msg,
                                         "path": [field_name],
                                     }
                                 )

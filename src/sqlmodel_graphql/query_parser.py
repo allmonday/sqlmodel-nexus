@@ -10,7 +10,6 @@ from graphql import FieldNode, OperationDefinitionNode, parse
 from sqlmodel_graphql.types import FieldSelection, QueryMeta, RelationshipSelection
 
 
-
 class QueryParser:
     """Parses GraphQL queries to extract QueryMeta for query optimization."""
 
