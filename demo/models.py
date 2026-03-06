@@ -54,10 +54,15 @@ class User(BaseEntity, table=True):
 
     @mutation(name="create_user", description="Create a new user")
     async def create(cls, name: str, email: str) -> "User":
-        """Create a new user."""
+        """Create a new user (idempotent)."""
         from demo.database import async_session
 
         async with async_session() as session:
+            # Idempotency check: return existing user if email already exists
+            existing = await session.exec(select(cls).where(cls.email == email))
+            if existing.first():
+                return existing.first()
+
             user = cls(name=name, email=email)
             session.add(user)
             await session.commit()
@@ -121,10 +126,17 @@ class Post(BaseEntity, table=True):
 
     @mutation(name="create_post", description="Create a new post")
     async def create(cls, title: str, content: str, author_id: int) -> "Post":
-        """Create a new post."""
+        """Create a new post (idempotent)."""
         from demo.database import async_session
 
         async with async_session() as session:
+            # Idempotency check: return existing post if same title + author
+            existing = await session.exec(
+                select(cls).where(cls.title == title, cls.author_id == author_id)
+            )
+            if existing.first():
+                return existing.first()
+
             post = cls(title=title, content=content, author_id=author_id)
             session.add(post)
             await session.commit()
@@ -202,10 +214,21 @@ class Comment(BaseEntity, table=True):
 
     @mutation(name="create_comment", description="Create a new comment")
     async def create(cls, content: str, post_id: int, author_id: int) -> "Comment":
-        """Create a new comment."""
+        """Create a new comment (idempotent)."""
         from demo.database import async_session
 
         async with async_session() as session:
+            # Idempotency check: return existing comment if same content + post + author
+            existing = await session.exec(
+                select(cls).where(
+                    cls.content == content,
+                    cls.post_id == post_id,
+                    cls.author_id == author_id,
+                )
+            )
+            if existing.first():
+                return existing.first()
+
             comment = cls(content=content, post_id=post_id, author_id=author_id)
             session.add(comment)
             await session.commit()

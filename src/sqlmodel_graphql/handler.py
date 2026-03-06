@@ -45,7 +45,10 @@ def _serialize_value(
             # Include all fields (including relationships)
             for field_name in dir(value):
                 if not field_name.startswith('_') and field_name not in result:
-                    field_value = getattr(value, field_name, None)
+                    try:
+                        field_value = getattr(value, field_name, None)
+                    except Exception:
+                        field_value = None
                     if field_value is not None and (
                         hasattr(field_value, "model_dump") or
                         isinstance(field_value, list)
@@ -59,7 +62,10 @@ def _serialize_value(
             # Then handle relationship fields
             for field_name, nested_include in include.items():
                 if field_name not in result and hasattr(value, field_name):
-                    field_value = getattr(value, field_name)
+                    try:
+                        field_value = getattr(value, field_name)
+                    except Exception:
+                        field_value = None
                     if field_value is not None:
                         result[field_name] = _serialize_value(field_value, nested_include)
         else:
@@ -69,7 +75,10 @@ def _serialize_value(
             # Handle relationship fields
             for field_name in include:
                 if field_name not in result and hasattr(value, field_name):
-                    field_value = getattr(value, field_name)
+                    try:
+                        field_value = getattr(value, field_name)
+                    except Exception:
+                        field_value = None
                     if field_value is not None:
                         result[field_name] = _serialize_value(field_value)
 
