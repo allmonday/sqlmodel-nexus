@@ -46,3 +46,4 @@ Thumbs.db
 # Distribution
 *.manifest
 *.spec
+.claude
