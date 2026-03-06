@@ -13,6 +13,7 @@ GraphQL SDL generation and query optimization for SQLModel.
 - **@query/@mutation Decorators**: Mark methods as GraphQL operations
 - **Query Optimization**: Parse GraphQL queries to generate optimized SQLAlchemy queries
 - **N+1 Prevention**: Automatic `selectinload` and `load_only` generation
+- **MCP Integration**: Expose GraphQL as MCP tools for AI assistants
 
 ## Installation
 
@@ -153,6 +154,82 @@ result = await handler.execute("""
 #     ]
 #   }
 # }
+```
+
+## MCP Integration
+
+Turn your SQLModel entities into AI-ready tools with a single function call.
+
+```python
+from sqlmodel_graphql.mcp import create_mcp_server
+from myapp.models import User, Post, Comment
+
+# Create MCP server from your entities
+mcp = create_mcp_server(
+    entities=[User, Post, Comment],
+    name="My Blog API"
+)
+
+# Run for AI assistants (Claude Desktop, etc.)
+mcp.run()
+```
+
+### Available MCP Tools
+
+The server exposes three tools for AI:
+
+1. **get_schema** - Discover available queries, mutations, and types
+2. **graphql_query** - Execute dynamic GraphQL queries with dot-notation field paths
+3. **graphql_mutation** - Execute GraphQL mutations
+
+### Example: AI Query Flow
+
+```
+AI: What data is available?
+    → get_schema() → Returns queries, mutations, types
+
+AI: Get users with their posts
+    → graphql_query(
+        operation_name="users",
+        arguments={"limit": 10},
+        fields=["id", "name", "posts.title", "posts.content"]
+      )
+
+AI: Create a new user
+    → graphql_mutation(
+        operation_name="create_user",
+        arguments={"name": "Alice", "email": "alice@example.com"},
+        fields=["id", "name"]
+      )
+```
+
+### Why MCP?
+
+Traditional GraphQL requires AI to:
+- Know the exact GraphQL syntax
+- Understand the full schema structure
+
+With MCP, AI can:
+- Discover schema dynamically via `get_schema`
+- Query with simple field paths (no GraphQL syntax needed)
+- Focus on business logic, not query construction
+
+### Installation
+
+```bash
+# Core library
+pip install sqlmodel-graphql
+
+# MCP support (optional)
+pip install mcp
+```
+
+### Running MCP Server
+
+```bash
+# demo/mcp_server.py
+uv run python demo/mcp_server.py           # stdio mode
+uv run python demo/mcp_server.py --http    # HTTP mode
 ```
 
 ## How It Works
