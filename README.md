@@ -5,12 +5,13 @@
 [![PyPI Downloads](https://static.pepy.tech/badge/sqlmodel-graphql/month)](https://pepy.tech/projects/sqlmodel-graphql)
 ![Python Versions](https://img.shields.io/pypi/pyversions/sqlmodel-graphql)
 
-**The Simplest Way to GraphQL -- Enable Your SQLModel Application**
+**Generate GraphQL APIs from SQLModel — zero configuration required**
 
 No schema files. No resolvers. No boilerplate.
+
 Just decorators and Python. Your SQLModel classes become GraphQL APIs instantly.
 
-**Plus: Built-in MCP Server** — Expose your data to AI assistants (Claude, GPT, etc.) with zero extra code.
+Plus: expose your GraphQL via MCP to AI assistants (Claude, GPT, etc.) with zero extra code.
 
 ## Features
 
