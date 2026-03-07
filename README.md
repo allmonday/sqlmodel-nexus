@@ -5,7 +5,12 @@
 [![PyPI Downloads](https://static.pepy.tech/badge/sqlmodel-graphql/month)](https://pepy.tech/projects/sqlmodel-graphql)
 ![Python Versions](https://img.shields.io/pypi/pyversions/sqlmodel-graphql)
 
-GraphQL SDL generation and query optimization for SQLModel.
+**The Simplest Way to GraphQL-Enable Your SQLModel Application**
+
+No schema files. No resolvers. No boilerplate.
+Just decorators and Python. Your SQLModel classes become GraphQL APIs instantly.
+
+**Plus: Built-in MCP Server** — Expose your data to AI assistants (Claude, GPT, etc.) with zero extra code.
 
 ## Features
 
