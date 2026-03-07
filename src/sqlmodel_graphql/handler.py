@@ -160,7 +160,11 @@ class GraphQLHandler:
             mutation_description: Optional custom description for Mutation type.
         """
         self.entities = self._discover_from_base(base)
-        self._sdl_generator = SDLGenerator(self.entities)
+        self._sdl_generator = SDLGenerator(
+            self.entities,
+            query_description=query_description,
+            mutation_description=mutation_description,
+        )
         self._query_parser = QueryParser()
 
         # Build method mappings: field_name -> (entity, method)

@@ -58,15 +58,24 @@ def _python_type_to_graphql_inner(
 class SDLGenerator:
     """Generates GraphQL SDL from SQLModel classes."""
 
-    def __init__(self, entities: list[type[SQLModel]]):
+    def __init__(
+        self,
+        entities: list[type[SQLModel]],
+        query_description: str | None = None,
+        mutation_description: str | None = None,
+    ):
         """Initialize the SDL generator.
 
         Args:
             entities: List of SQLModel classes to generate schema for.
+            query_description: Optional custom description for Query type.
+            mutation_description: Optional custom description for Mutation type.
         """
         self.entities = entities
         self._entity_names = {e.__name__ for e in entities}
         self._converter = TypeConverter(self._entity_names)
+        self._query_description = query_description
+        self._mutation_description = mutation_description
 
     def generate(self) -> str:
         """Generate complete GraphQL SDL string."""
@@ -83,12 +92,18 @@ class SDLGenerator:
         # 3. Generate Query type
         query_fields = self._collect_query_fields()
         if query_fields:
-            parts.append(f"type Query {{\n{chr(10).join(query_fields)}\n}}")
+            query_def = f"type Query {{\n{chr(10).join(query_fields)}\n}}"
+            if self._query_description:
+                query_def = f'"""{self._query_description}"""\n{query_def}'
+            parts.append(query_def)
 
         # 4. Generate Mutation type
         mutation_fields = self._collect_mutation_fields()
         if mutation_fields:
-            parts.append(f"type Mutation {{\n{chr(10).join(mutation_fields)}\n}}")
+            mutation_def = f"type Mutation {{\n{chr(10).join(mutation_fields)}\n}}"
+            if self._mutation_description:
+                mutation_def = f'"""{self._mutation_description}"""\n{mutation_def}'
+            parts.append(mutation_def)
 
         return "\n\n".join(parts)
 
@@ -116,6 +131,9 @@ class SDLGenerator:
         # Get scalar fields from model_fields
         for field_name, field_info in entity.model_fields.items():
             gql_type = self._field_info_to_graphql(field_info)
+            # Add field description if available
+            if field_info.description:
+                fields.append(f'  """{field_info.description}"""')
             fields.append(f"  {field_name}: {gql_type}")
 
         # Get relationship fields from type hints
@@ -129,7 +147,11 @@ class SDLGenerator:
             if gql_type:
                 fields.append(f"  {field_name}: {gql_type}")
 
-        return f"type {entity.__name__} {{\n{chr(10).join(fields)}\n}}"
+        # Build type definition with optional description
+        type_def = f"type {entity.__name__} {{\n{chr(10).join(fields)}\n}}"
+        if entity.__doc__:
+            type_def = f'"""{entity.__doc__}"""\n{type_def}'
+        return type_def
 
     def _field_info_to_graphql(self, field_info: Any) -> str:
         """Convert Pydantic FieldInfo to GraphQL type."""
