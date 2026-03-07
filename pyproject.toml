@@ -33,6 +33,7 @@ demo = [
     "fastapi>=0.100.0",
     "uvicorn>=0.23.0",
     "aiosqlite>=0.19.0",
+    "greenlet>=3.3.2",
 ]
 mcp = [
     "mcp>=1.0.0",
