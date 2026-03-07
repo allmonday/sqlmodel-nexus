@@ -235,8 +235,8 @@ pip install mcp
 
 ```bash
 # demo/mcp_server.py
-uv run python demo/mcp_server.py           # stdio mode
-uv run python demo/mcp_server.py --http    # HTTP mode
+uv run python --with mcp demo/mcp_server.py           # stdio mode
+uv run python --with mcp demo/mcp_server.py --http    # HTTP mode
 ```
 
 ## How It Works
