@@ -1111,6 +1111,7 @@ dependencies = [
 demo = [
     { name = "aiosqlite" },
     { name = "fastapi" },
+    { name = "greenlet" },
     { name = "uvicorn" },
 ]
 dev = [
@@ -1139,6 +1140,7 @@ requires-dist = [
     { name = "aiosqlite", marker = "extra == 'dev'", specifier = ">=0.19.0" },
     { name = "fastapi", marker = "extra == 'demo'", specifier = ">=0.100.0" },
     { name = "graphql-core", specifier = ">=3.2.0" },
+    { name = "greenlet", marker = "extra == 'demo'", specifier = ">=3.3.2" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.0.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
