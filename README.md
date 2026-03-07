@@ -5,7 +5,7 @@
 [![PyPI Downloads](https://static.pepy.tech/badge/sqlmodel-graphql/month)](https://pepy.tech/projects/sqlmodel-graphql)
 ![Python Versions](https://img.shields.io/pypi/pyversions/sqlmodel-graphql)
 
-**Generate GraphQL APIs from SQLModel — zero configuration required**
+**Generate GraphQL APIs & MCP from SQLModel — zero configuration required**
 
 No schema files. No resolvers. No boilerplate.
 
