@@ -361,3 +361,336 @@ class TestMCPServerCreation:
         # Check that server was created
         assert mcp is not None
         assert mcp.name == "Test API"
+
+
+class TestListOperations:
+    """Tests for list_queries and list_mutations tools."""
+
+    def test_list_queries_returns_names_and_descriptions(self) -> None:
+        """Test that list_queries returns names and descriptions."""
+        from sqlmodel import Field, SQLModel
+
+        from sqlmodel_graphql import query
+        from sqlmodel_graphql.handler import GraphQLHandler
+        from sqlmodel_graphql.mcp.builders.type_tracer import TypeTracer
+
+        class TestBase(SQLModel):
+            pass
+
+        class TestUser(TestBase, table=False):
+            id: int = Field(primary_key=True)
+            name: str
+
+            @query(name="test_users")
+            async def get_all(cls) -> list[TestUser]:
+                """Get all test users."""
+                return []
+
+        handler = GraphQLHandler(base=TestBase)
+        introspection = handler._introspection_generator.generate()
+        entity_names = {e.__name__ for e in handler.entities}
+        tracer = TypeTracer(introspection, entity_names)
+
+        queries = tracer.list_operation_fields("Query")
+
+        assert len(queries) == 1
+        assert queries[0]["name"] == "test_users"
+        assert queries[0]["description"] == "Get all test users."
+
+    def test_list_queries_empty_when_no_queries(self) -> None:
+        """Test that list_queries returns empty list when no queries."""
+        from sqlmodel import SQLModel
+
+        from sqlmodel_graphql.handler import GraphQLHandler
+        from sqlmodel_graphql.mcp.builders.type_tracer import TypeTracer
+
+        class TestBase(SQLModel):
+            pass
+
+        handler = GraphQLHandler(base=TestBase)
+        introspection = handler._introspection_generator.generate()
+        entity_names = {e.__name__ for e in handler.entities}
+        tracer = TypeTracer(introspection, entity_names)
+
+        queries = tracer.list_operation_fields("Query")
+
+        assert queries == []
+
+    def test_list_mutations_returns_names_and_descriptions(self) -> None:
+        """Test that list_mutations returns names and descriptions."""
+        from sqlmodel import Field, SQLModel
+
+        from sqlmodel_graphql import mutation
+        from sqlmodel_graphql.handler import GraphQLHandler
+        from sqlmodel_graphql.mcp.builders.type_tracer import TypeTracer
+
+        class TestBase(SQLModel):
+            pass
+
+        class TestUser(TestBase, table=False):
+            id: int = Field(primary_key=True)
+            name: str
+
+            @mutation(name="create_test_user")
+            async def create(cls, name: str) -> TestUser:
+                """Create a test user."""
+                return TestUser(id=1, name=name)
+
+        handler = GraphQLHandler(base=TestBase)
+        introspection = handler._introspection_generator.generate()
+        entity_names = {e.__name__ for e in handler.entities}
+        tracer = TypeTracer(introspection, entity_names)
+
+        mutations = tracer.list_operation_fields("Mutation")
+
+        assert len(mutations) == 1
+        assert mutations[0]["name"] == "create_test_user"
+
+
+class TestGetOperationSchema:
+    """Tests for get_query_schema and get_mutation_schema tools."""
+
+    def test_get_query_schema_returns_operation_info(self) -> None:
+        """Test that get_query_schema returns operation info."""
+        from sqlmodel import Field, SQLModel
+
+        from sqlmodel_graphql import query
+        from sqlmodel_graphql.handler import GraphQLHandler
+        from sqlmodel_graphql.mcp.builders.type_tracer import TypeTracer
+
+        class TestBase(SQLModel):
+            pass
+
+        class TestUser(TestBase, table=False):
+            id: int = Field(primary_key=True)
+            name: str
+
+            @query(name="test_user")
+            async def get_by_id(cls, user_id: int) -> TestUser | None:
+                """Get user by ID."""
+                return None
+
+        handler = GraphQLHandler(base=TestBase)
+        introspection = handler._introspection_generator.generate()
+        entity_names = {e.__name__ for e in handler.entities}
+        tracer = TypeTracer(introspection, entity_names)
+
+        operation = tracer.get_operation_field("Query", "test_user")
+
+        assert operation is not None
+        assert operation["name"] == "test_user"
+        assert len(operation["args"]) == 1
+        assert operation["args"][0]["name"] == "user_id"
+
+    def test_get_query_schema_returns_related_types(self) -> None:
+        """Test that get_query_schema can collect related types from introspection data."""
+        # This test uses manually constructed introspection data to avoid
+        # Python's forward reference issues when classes are defined inside methods.
+        # See test_type_tracer.py for comprehensive tests of type tracing.
+        from sqlmodel_graphql.mcp.builders.type_tracer import TypeTracer
+
+        introspection = {
+            "types": [
+                {
+                    "kind": "OBJECT",
+                    "name": "Query",
+                    "fields": [
+                        {
+                            "name": "users",
+                            "description": "Get all users",
+                            "args": [],
+                            "type": {
+                                "kind": "NON_NULL",
+                                "ofType": {
+                                    "kind": "LIST",
+                                    "ofType": {
+                                        "kind": "NON_NULL",
+                                        "ofType": {"kind": "OBJECT", "name": "User"},
+                                    },
+                                },
+                            },
+                        }
+                    ],
+                },
+                {
+                    "kind": "OBJECT",
+                    "name": "User",
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "kind": "NON_NULL",
+                                "ofType": {"kind": "SCALAR", "name": "Int"},
+                            },
+                        },
+                        {
+                            "name": "posts",
+                            "type": {
+                                "kind": "NON_NULL",
+                                "ofType": {
+                                    "kind": "LIST",
+                                    "ofType": {
+                                        "kind": "NON_NULL",
+                                        "ofType": {"kind": "OBJECT", "name": "Post"},
+                                    },
+                                },
+                            },
+                        },
+                    ],
+                },
+                {
+                    "kind": "OBJECT",
+                    "name": "Post",
+                    "fields": [
+                        {
+                            "name": "id",
+                            "type": {
+                                "kind": "NON_NULL",
+                                "ofType": {"kind": "SCALAR", "name": "Int"},
+                            },
+                        },
+                        {
+                            "name": "author",
+                            "type": {
+                                "kind": "NON_NULL",
+                                "ofType": {"kind": "OBJECT", "name": "User"},
+                            },
+                        },
+                    ],
+                },
+            ]
+        }
+
+        tracer = TypeTracer(introspection, {"User", "Post"})
+
+        # Get operation and collect related types
+        operation = tracer.get_operation_field("Query", "users")
+        assert operation is not None
+
+        related_types = tracer.collect_related_types(operation["type"])
+
+        # Should include both User and Post (User -> posts -> Post)
+        assert "User" in related_types
+        assert "Post" in related_types
+
+    def test_get_query_schema_nonexistent_returns_none(self) -> None:
+        """Test that get_query_schema returns None for nonexistent query."""
+        from sqlmodel import SQLModel
+
+        from sqlmodel_graphql.handler import GraphQLHandler
+        from sqlmodel_graphql.mcp.builders.type_tracer import TypeTracer
+
+        class TestBase(SQLModel):
+            pass
+
+        handler = GraphQLHandler(base=TestBase)
+        introspection = handler._introspection_generator.generate()
+        entity_names = {e.__name__ for e in handler.entities}
+        tracer = TypeTracer(introspection, entity_names)
+
+        operation = tracer.get_operation_field("Query", "nonexistent")
+
+        assert operation is None
+
+    def test_get_mutation_schema_returns_operation_info(self) -> None:
+        """Test that get_mutation_schema returns operation info."""
+        from sqlmodel import Field, SQLModel
+
+        from sqlmodel_graphql import mutation
+        from sqlmodel_graphql.handler import GraphQLHandler
+        from sqlmodel_graphql.mcp.builders.type_tracer import TypeTracer
+
+        class TestBase(SQLModel):
+            pass
+
+        class TestUser(TestBase, table=False):
+            id: int = Field(primary_key=True)
+            name: str
+
+            @mutation(name="create_test_user")
+            async def create(cls, name: str) -> TestUser:
+                return TestUser(id=1, name=name)
+
+        handler = GraphQLHandler(base=TestBase)
+        introspection = handler._introspection_generator.generate()
+        entity_names = {e.__name__ for e in handler.entities}
+        tracer = TypeTracer(introspection, entity_names)
+
+        operation = tracer.get_operation_field("Mutation", "create_test_user")
+
+        assert operation is not None
+        assert operation["name"] == "create_test_user"
+
+    def test_operation_with_no_arguments(self) -> None:
+        """Test operation with no arguments."""
+        from sqlmodel import Field, SQLModel
+
+        from sqlmodel_graphql import query
+        from sqlmodel_graphql.handler import GraphQLHandler
+        from sqlmodel_graphql.mcp.builders.type_tracer import TypeTracer
+
+        class TestBase(SQLModel):
+            pass
+
+        class TestUser(TestBase, table=False):
+            id: int = Field(primary_key=True)
+            name: str
+
+            @query(name="all_test_users")
+            async def get_all(cls) -> list[TestUser]:
+                return []
+
+        handler = GraphQLHandler(base=TestBase)
+        introspection = handler._introspection_generator.generate()
+        entity_names = {e.__name__ for e in handler.entities}
+        tracer = TypeTracer(introspection, entity_names)
+
+        operation = tracer.get_operation_field("Query", "all_test_users")
+
+        assert operation is not None
+        assert operation["args"] == []
+
+
+class TestThreeLayerProgressiveDisclosure:
+    """Integration tests for three-layer progressive disclosure."""
+
+    def test_full_workflow(self) -> None:
+        """Test full workflow from list to schema."""
+        from sqlmodel import Field, SQLModel
+
+        from sqlmodel_graphql import query
+        from sqlmodel_graphql.handler import GraphQLHandler
+        from sqlmodel_graphql.mcp.builders.type_tracer import TypeTracer
+
+        class TestBase(SQLModel):
+            pass
+
+        class TestUser(TestBase, table=False):
+            id: int = Field(primary_key=True)
+            name: str
+
+            @query(name="test_users")
+            async def get_all(cls, limit: int = 10) -> list["TestUser"]:
+                """Get all test users."""
+                return []
+
+        handler = GraphQLHandler(base=TestBase)
+        introspection = handler._introspection_generator.generate()
+        entity_names = {e.__name__ for e in handler.entities}
+        tracer = TypeTracer(introspection, entity_names)
+
+        # Layer 1: List queries
+        queries = tracer.list_operation_fields("Query")
+        assert len(queries) == 1
+        assert queries[0]["name"] == "test_users"
+
+        # Layer 2: Get query schema
+        operation = tracer.get_operation_field("Query", "test_users")
+        assert operation is not None
+        assert operation["name"] == "test_users"
+        assert operation["description"] == "Get all test users."
+
+        # Note: Due to Python's forward reference limitations when classes are
+        # defined inside methods, the return type may not be correctly resolved.
+        # The TypeTracer tests in test_type_tracer.py cover the full functionality
+        # with properly defined classes.

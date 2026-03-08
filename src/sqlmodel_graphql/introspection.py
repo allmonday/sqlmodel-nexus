@@ -126,14 +126,16 @@ class IntrospectionGenerator:
 
     def _build_entity_type(self, entity: type[SQLModel]) -> dict:
         """Build introspection data for an entity type."""
-        fields: list[dict] = []
+        scalar_fields: list[dict] = []
+        object_fields: list[dict] = []
 
-        # Get scalar fields from model_fields
+        # Collect all fields preserving definition order
+        all_fields: list[tuple[str, Any, str | None]] = []
+
+        # Get fields from model_fields
         for field_name, field_info in entity.model_fields.items():
-            # 提取 Field(description="...") 中的描述
             description = field_info.description
-            field = self._build_field(field_name, field_info.annotation, description)
-            fields.append(field)
+            all_fields.append((field_name, field_info.annotation, description))
 
         # Get relationship fields from type hints (only entity references)
         try:
@@ -147,8 +149,18 @@ class IntrospectionGenerator:
 
             # Only include if it's a relationship to another entity
             if self._is_entity_relationship(hint):
-                field = self._build_field(field_name, hint)
-                fields.append(field)
+                all_fields.append((field_name, hint, None))
+
+        # Group fields by type (scalar vs object)
+        for field_name, type_hint, description in all_fields:
+            field = self._build_field(field_name, type_hint, description)
+            if self._is_scalar_field(type_hint):
+                scalar_fields.append(field)
+            else:
+                object_fields.append(field)
+
+        # Combine: scalar fields first, then object fields
+        fields = scalar_fields + object_fields
 
         return {
             "kind": "OBJECT",
@@ -164,6 +176,19 @@ class IntrospectionGenerator:
     def _is_entity_relationship(self, hint: Any) -> bool:
         """Check if a type hint represents a relationship to another entity."""
         return self._converter.is_relationship(hint)
+
+    def _is_scalar_field(self, type_hint: Any) -> bool:
+        """Check if a field is a scalar type (not an object/relationship)."""
+        # Unwrap wrappers (Optional, list, Mapped)
+        base_type = self._converter.unwrap_to_base_type(type_hint)
+
+        # Check if it's a scalar or enum
+        if self._converter.get_scalar_type_name(base_type):
+            return True
+        if self._converter.is_enum_type(base_type):
+            return True
+
+        return False
 
     def _build_enum_type(self, enum_class: type[Enum]) -> dict:
         """Build introspection data for an enum type."""
