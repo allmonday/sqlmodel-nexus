@@ -11,7 +11,7 @@ No schema files. No resolvers. No boilerplate.
 
 Just decorators and Python. Your SQLModel classes become GraphQL APIs instantly.
 
-Plus: expose your GraphQL via MCP to AI assistants (Claude, GPT, etc.) with zero extra code.
+Plus: expose your GraphQL via MCP to AI assistants (Claude, GPT, etc.) with **three-layer progressive disclosure** — AI discovers what's available, understands the schema, then executes queries efficiently.
 
 ## Features
 
@@ -19,7 +19,7 @@ Plus: expose your GraphQL via MCP to AI assistants (Claude, GPT, etc.) with zero
 - **@query/@mutation Decorators**: Mark methods as GraphQL operations
 - **Query Optimization**: Parse GraphQL queries to generate optimized SQLAlchemy queries
 - **N+1 Prevention**: Automatic `selectinload` and `load_only` generation
-- **MCP Integration**: Expose GraphQL as MCP tools for AI assistants
+- **MCP Integration**: Expose GraphQL as MCP tools with progressive disclosure for minimal context usage
 
 ## Installation
 
