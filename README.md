@@ -95,6 +95,64 @@ class Post(BaseEntity, table=True):
     author: Optional[User] = Relationship(back_populates="posts")
 ```
 
+### Understanding query_meta
+
+The `query_meta` parameter is automatically injected by the framework to optimize your database queries. It analyzes the GraphQL query's field selections and generates SQLAlchemy optimizations to prevent N+1 queries.
+
+**How it works:**
+
+1. Framework parses GraphQL query: `{ users { name posts { title } } }`
+2. Creates QueryMeta with field selections and relationships
+3. Injects it into your `@query` method
+4. `query_meta.to_options(Entity)` generates optimized SQLAlchemy options
+
+**Benefits:**
+
+- **Automatic N+1 Prevention**: Related data is loaded in batches, not individual queries
+- **Field Selection**: Only requested fields are loaded from database
+- **Zero Configuration**: Works automatically, no manual optimization needed
+
+**Example transformation:**
+
+```
+GraphQL Query:                    SQLAlchemy Optimization:
+────────────────                 ────────────────────────
+{ users {                         select(User).options(
+  name                              load_only(User.name),
+  posts {                           selectinload(User.posts).options(
+    title                             load_only(Post.title)
+  }                                 )
+}                                 )
+```
+
+Without `query_meta`, loading 10 users with posts would execute:
+- 1 query for users
+- 10 queries for posts (N+1 problem!)
+
+With `query_meta`, it executes:
+- 1 query for users
+- 1 query for all posts (batched!)
+
+**Usage Pattern:**
+
+```python
+@query(name='users')
+async def get_users(cls, query_meta: QueryMeta | None = None) -> list['User']:
+    async with get_session() as session:
+        stmt = select(cls)
+        if query_meta:
+            stmt = stmt.options(*query_meta.to_options(cls))
+        result = await session.exec(stmt)
+        return list(result.all())
+```
+
+**Key Points:**
+
+- `query_meta` is optional (`QueryMeta | None = None`)
+- Always check `if query_meta:` before using
+- Works with nested relationships of any depth
+- For mutations, only injected when returning entity types (not scalars)
+
 ### 2. Create Handler (Auto-generates SDL)
 
 ```python
@@ -267,38 +325,6 @@ pip install sqlmodel-graphql[mcp]
 uv run python --with mcp demo/mcp_server.py           # stdio mode
 uv run python --with mcp demo/mcp_server.py --http    # HTTP mode
 ```
-
-## How It Works
-
-```
-GraphQL Query                        QueryMeta
-─────────────                        ─────────
-{ users {                            QueryMeta(
-  id                                   fields=[FieldSelection('id'), FieldSelection('name')],
-  name                                 relationships={
-  posts {                                'posts': RelationshipSelection(
-    title                                  fields=[FieldSelection('title')]
-  }                                     }
-}                                     }
-)
-       ↓
-  query_meta.to_options(User)
-       ↓
-  select(User).options(
-    load_only(User.id, User.name),
-    selectinload(User.posts).options(load_only(Post.title))
-  )
-```
-
-### Query Optimization Flow
-
-1. **GraphQLHandler** receives the query
-2. **QueryParser** parses the selection set into **QueryMeta**
-3. **QueryMeta** is injected into your `@query` method as `query_meta` parameter
-4. **query_meta.to_options(entity)** generates SQLAlchemy options:
-   - `load_only()` for requested scalar fields
-   - `selectinload()` for requested relationships
-5. Database query only fetches what's needed, preventing N+1 problems
 
 ## API Reference
 
