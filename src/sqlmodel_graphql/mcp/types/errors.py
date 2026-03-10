@@ -22,6 +22,11 @@ class MCPErrors(str, Enum):
     SCHEMA_NOT_FOUND = "schema_not_found"
     TYPE_NOT_FOUND = "type_not_found"
 
+    # Multi-app errors
+    APP_NOT_FOUND = "app_not_found"
+    APP_NAME_REQUIRED = "app_name_required"
+    INVALID_APP_MODE = "invalid_app_mode"
+
     # General errors
     INTERNAL_ERROR = "internal_error"
     VALIDATION_ERROR = "validation_error"

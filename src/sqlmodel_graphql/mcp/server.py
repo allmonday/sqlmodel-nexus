@@ -1,6 +1,6 @@
 """MCP Server for sqlmodel-graphql.
 
-Provides a FastMCP server that exposes GraphQL operations as MCP tools
+Provides a FastMCP server that exposes multiple GraphQL applications as MCP tools
 with three-layer progressive disclosure for reduced context usage.
 """
 
@@ -8,33 +8,29 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlmodel_graphql.handler import GraphQLHandler
-from sqlmodel_graphql.mcp.builders.type_tracer import TypeTracer
-from sqlmodel_graphql.mcp.tools import (
-    register_get_operation_schema_tools,
-    register_graphql_mutation_tool,
-    register_graphql_query_tool,
-    register_list_operations_tools,
-)
+from sqlmodel_graphql.mcp.managers import MultiAppManager
+from sqlmodel_graphql.mcp.tools.multi_app_tools import register_multi_app_tools
+from sqlmodel_graphql.mcp.types.app_config import AppConfig
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
-    from sqlmodel import SQLModel
 
 
 def create_mcp_server(
-    base: type[SQLModel],
-    name: str = "SQLModel GraphQL API",
-    query_description: str | None = None,
-    mutation_description: str | None = None,
+    apps: list[AppConfig],
+    name: str = "Multi-App SQLModel GraphQL API",
 ) -> FastMCP:
-    """Create an MCP server that exposes GraphQL operations as tools.
+    """Create an MCP server that exposes multiple GraphQL APIs as tools.
 
-    This function creates a FastMCP server with three-layer progressive disclosure:
+    This function creates a FastMCP server with multi-app support and three-layer
+    progressive disclosure:
+
+    **Layer 0 (App Discovery):**
+    - list_apps: List all available applications
 
     **Layer 1 (Lightweight):**
-    - list_queries: List query names and descriptions (~50 tokens)
-    - list_mutations: List mutation names and descriptions (~50 tokens)
+    - list_queries: List query names and descriptions for a specific app
+    - list_mutations: List mutation names and descriptions for a specific app
 
     **Layer 2 (On-demand):**
     - get_query_schema: Get query details + related type introspection
@@ -44,26 +40,42 @@ def create_mcp_server(
     - graphql_query: Execute GraphQL queries
     - graphql_mutation: Execute GraphQL mutations
 
+    All tools (except list_apps) require a mandatory app_name parameter.
+
     Args:
-        base: SQLModel base class. All subclasses with @query/@mutation
-              decorators will be automatically discovered.
+        apps: List of app configurations. Each app has its own GraphQL schema
+              and independent database.
         name: Name of the MCP server (shown in MCP clients).
-        query_description: Optional custom description for Query type.
-        mutation_description: Optional custom description for Mutation type.
 
     Returns:
         A configured FastMCP server instance.
 
     Example:
         ```python
-        from myapp.models import BaseEntity
+        from myapp.blog_models import BlogBaseEntity
+        from myapp.shop_models import ShopBaseEntity
         from sqlmodel_graphql.mcp import create_mcp_server
 
+        apps = [
+            {
+                "name": "blog",
+                "base": BlogBaseEntity,
+                "description": "Blog system API",
+                "query_description": "Query users, posts, and comments",
+                "mutation_description": "Create and update blog data",
+            },
+            {
+                "name": "shop",
+                "base": ShopBaseEntity,
+                "description": "E-commerce system API",
+                "query_description": "Query products and orders",
+                "mutation_description": "Create orders and products",
+            }
+        ]
+
         mcp = create_mcp_server(
-            base=BaseEntity,
-            name="My Blog GraphQL API",
-            query_description="Query users, posts, and comments",
-            mutation_description="Create and update data",
+            apps=apps,
+            name="My Multi-App GraphQL API"
         )
 
         # Run with stdio transport (default)
@@ -72,37 +84,25 @@ def create_mcp_server(
         # Or run with HTTP transport
         mcp.run(transport="streamable-http")
         ```
+
+    Tools provided:
+        - list_apps(): List all available apps
+        - list_queries(app_name): List queries for an app
+        - list_mutations(app_name): List mutations for an app
+        - get_query_schema(name, app_name, response_type): Get query details
+        - get_mutation_schema(name, app_name, response_type): Get mutation details
+        - graphql_query(query, app_name): Execute a GraphQL query
+        - graphql_mutation(mutation, app_name): Execute a GraphQL mutation
     """
     from mcp.server.fastmcp import FastMCP
 
-    # Create the GraphQL handler
-    handler = GraphQLHandler(
-        base=base,
-        query_description=query_description,
-        mutation_description=mutation_description,
-    )
-
-    # Get introspection data and entity names
-    introspection_data = handler._introspection_generator.generate()
-    entity_names = {e.__name__ for e in handler.entities}
-
-    # Create the type tracer for progressive disclosure
-    tracer = TypeTracer(introspection_data, entity_names)
-
-    # Get SDL generator for direct SDL generation
-    sdl_generator = handler._sdl_generator
+    # Create the multi-app manager
+    manager = MultiAppManager(apps)
 
     # Create the FastMCP server
     mcp = FastMCP(name)
 
-    # Register Layer 1 tools (lightweight operation lists)
-    register_list_operations_tools(mcp, tracer)
-
-    # Register Layer 2 tools (operation details + related types)
-    register_get_operation_schema_tools(mcp, tracer, sdl_generator)
-
-    # Register Layer 3 tools (query execution)
-    register_graphql_query_tool(mcp, handler)
-    register_graphql_mutation_tool(mcp, handler)
+    # Register all multi-app tools
+    register_multi_app_tools(mcp, manager)
 
     return mcp
