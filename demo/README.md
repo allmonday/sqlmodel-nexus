@@ -9,7 +9,7 @@ This demo showcases the SQLModel GraphQL library with a GraphiQL interface.
 uv sync --extra demo
 
 # Start the server
-cd demo && uv run uvicorn app:app --reload
+uv run uvicorn demo.app:app --reload
 ```
 
 ## Accessing the Interface
