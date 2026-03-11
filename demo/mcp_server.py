@@ -43,7 +43,7 @@ def main() -> None:
     args = parser.parse_args()
 
     mcp = create_mcp_server(
-        base=BaseEntity,
+        apps=[{"name": "Blog", "base": BaseEntity}],
         name="Demo Blog GraphQL MCP Server",
     )
 
