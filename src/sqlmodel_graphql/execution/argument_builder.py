@@ -40,8 +40,11 @@ class ArgumentBuilder:
         for arg in selection.arguments:
             arg_name = arg.name.value
 
-            # Get the value (from literal or variable)
-            if hasattr(arg.value, "value"):
+            # Get the value (from literal, list, or variable)
+            if hasattr(arg.value, "values"):
+                # List value - extract each element
+                value = [v.value for v in arg.value.values]
+            elif hasattr(arg.value, "value"):
                 # Literal value
                 value = arg.value.value
             elif hasattr(arg.value, "name"):
