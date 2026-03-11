@@ -203,8 +203,15 @@ class TestMCPServerCreation:
             async def get_all(cls) -> list[TestEntity]:
                 return []
 
+        apps = [
+            {
+                "name": "test",
+                "base": TestBase,
+                "description": "Test application",
+            }
+        ]
         mcp = create_mcp_server(
-            base=TestBase,
+            apps=apps,
             name="Test API",
         )
 

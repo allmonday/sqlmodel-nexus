@@ -215,3 +215,50 @@ class TestDiscoverFromBaseWithRelationships:
         # SDL should include the related entity type
         assert "type HandlerTestBook" in sdl
         assert "type HandlerTestAuthor" in sdl
+
+
+# ============================================================================
+# Tests for list[str] argument handling
+# ============================================================================
+
+
+class HandlerTestListArg(HandlerTestBase, table=False):
+    """Test entity with list[str] argument."""
+
+    id: int = Field(primary_key=True)
+    tags: list[str] = Field(default_factory=list)
+
+    @query(name="test_by_tags")
+    async def get_by_tags(
+        cls, tags: list[str], query_meta: QueryMeta | None = None
+    ) -> list[HandlerTestListArg]:
+        """Get items by tags list."""
+        return [HandlerTestListArg(id=i, tags=tags) for i in range(len(tags))]
+
+
+class TestListStrArgument:
+    """Tests for list[str] argument handling with literal values."""
+
+    @pytest.fixture
+    def handler(self) -> GraphQLHandler:
+        """Create handler with base parameter."""
+        return GraphQLHandler(base=HandlerTestBase)
+
+    @pytest.mark.asyncio
+    async def test_list_str_argument_literal(self, handler: GraphQLHandler) -> None:
+        """Test executing a query with list[str] argument as literal."""
+        result = await handler.execute('{ test_by_tags(tags: ["tag1", "tag2"]) { id tags } }')
+
+        assert "data" in result
+        assert "test_by_tags" in result["data"]
+        assert len(result["data"]["test_by_tags"]) == 2
+        assert result["data"]["test_by_tags"][0]["tags"] == ["tag1", "tag2"]
+
+    @pytest.mark.asyncio
+    async def test_list_str_argument_empty(self, handler: GraphQLHandler) -> None:
+        """Test executing a query with empty list[str] argument."""
+        result = await handler.execute('{ test_by_tags(tags: []) { id tags } }')
+
+        assert "data" in result
+        assert "test_by_tags" in result["data"]
+        assert len(result["data"]["test_by_tags"]) == 0

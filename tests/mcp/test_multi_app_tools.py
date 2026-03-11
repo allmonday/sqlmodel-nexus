@@ -26,14 +26,12 @@ class BlogUser(BlogBaseEntity, table=True):
     email: str
 
     @query
-    @staticmethod
-    async def get_blog_users(limit: int = 10) -> list["BlogUser"]:
+    async def get_blog_users(cls, limit: int = 10, query_meta=None) -> list["BlogUser"]:
         """Get blog users."""
         return []
 
     @mutation
-    @staticmethod
-    async def create_blog_user(name: str, email: str) -> "BlogUser":
+    async def create_blog_user(cls, name: str, email: str, query_meta=None) -> "BlogUser":
         """Create a blog user."""
         return BlogUser(name=name, email=email)
 
@@ -50,19 +48,17 @@ class ShopProduct(ShopBaseEntity, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     name: str
-    price: float
+    description: str = ""
 
     @query
-    @staticmethod
-    async def get_shop_products(limit: int = 10) -> list["ShopProduct"]:
+    async def get_shop_products(cls, limit: int = 10, query_meta=None) -> list["ShopProduct"]:
         """Get shop products."""
         return []
 
     @mutation
-    @staticmethod
-    async def create_shop_product(name: str, price: float) -> "ShopProduct":
+    async def create_shop_product(cls, name: str, description: str = "", query_meta=None) -> "ShopProduct":
         """Create a shop product."""
-        return ShopProduct(name=name, price=price)
+        return ShopProduct(name=name, description=description)
 
 
 @pytest.fixture
@@ -95,8 +91,7 @@ class TestMultiAppTools:
         assert multi_app_mcp is not None
         assert multi_app_mcp.name == "Test Multi-App"
 
-    @pytest.mark.asyncio
-    async def test_list_apps_tool(self, multi_app_mcp):
+    def test_list_apps_tool(self, multi_app_mcp):
         """Test list_apps tool returns all configured apps."""
         # Get the tool
         tools = multi_app_mcp._tool_manager._tools
@@ -104,8 +99,8 @@ class TestMultiAppTools:
 
         assert list_apps_tool is not None
 
-        # Execute the tool
-        result = await list_apps_tool.fn()
+        # Execute the tool (not async)
+        result = list_apps_tool.fn()
 
         assert result["success"] is True
         assert len(result["data"]) == 2
@@ -122,13 +117,12 @@ class TestMultiAppTools:
             assert "queries_count" in app
             assert "mutations_count" in app
 
-    @pytest.mark.asyncio
-    async def test_list_queries_with_valid_app(self, multi_app_mcp):
+    def test_list_queries_with_valid_app(self, multi_app_mcp):
         """Test list_queries tool with a valid app_name."""
         tools = multi_app_mcp._tool_manager._tools
         list_queries_tool = tools.get("list_queries")
 
-        result = await list_queries_tool.fn(app_name="blog")
+        result = list_queries_tool.fn(app_name="blog")
 
         assert result["success"] is True
         assert isinstance(result["data"], list)
@@ -139,25 +133,23 @@ class TestMultiAppTools:
         assert "name" in query
         assert "description" in query
 
-    @pytest.mark.asyncio
-    async def test_list_queries_with_invalid_app(self, multi_app_mcp):
+    def test_list_queries_with_invalid_app(self, multi_app_mcp):
         """Test list_queries tool with an invalid app_name."""
         tools = multi_app_mcp._tool_manager._tools
         list_queries_tool = tools.get("list_queries")
 
-        result = await list_queries_tool.fn(app_name="nonexistent")
+        result = list_queries_tool.fn(app_name="nonexistent")
 
         assert result["success"] is False
         assert "not found" in result["error"]
         assert "error_type" in result
 
-    @pytest.mark.asyncio
-    async def test_list_mutations_with_valid_app(self, multi_app_mcp):
+    def test_list_mutations_with_valid_app(self, multi_app_mcp):
         """Test list_mutations tool with a valid app_name."""
         tools = multi_app_mcp._tool_manager._tools
         list_mutations_tool = tools.get("list_mutations")
 
-        result = await list_mutations_tool.fn(app_name="shop")
+        result = list_mutations_tool.fn(app_name="shop")
 
         assert result["success"] is True
         assert isinstance(result["data"], list)
@@ -168,29 +160,27 @@ class TestMultiAppTools:
         assert "name" in mutation
         assert "description" in mutation
 
-    @pytest.mark.asyncio
-    async def test_list_mutations_with_invalid_app(self, multi_app_mcp):
+    def test_list_mutations_with_invalid_app(self, multi_app_mcp):
         """Test list_mutations tool with an invalid app_name."""
         tools = multi_app_mcp._tool_manager._tools
         list_mutations_tool = tools.get("list_mutations")
 
-        result = await list_mutations_tool.fn(app_name="nonexistent")
+        result = list_mutations_tool.fn(app_name="nonexistent")
 
         assert result["success"] is False
         assert "not found" in result["error"]
 
-    @pytest.mark.asyncio
-    async def test_get_query_schema_sdl_format(self, multi_app_mcp):
+    def test_get_query_schema_sdl_format(self, multi_app_mcp):
         """Test get_query_schema tool with SDL format."""
         tools = multi_app_mcp._tool_manager._tools
         get_query_schema_tool = tools.get("get_query_schema")
 
         # First get the list of queries to find a valid query name
         list_queries_tool = tools.get("list_queries")
-        queries_result = await list_queries_tool.fn(app_name="blog")
+        queries_result = list_queries_tool.fn(app_name="blog")
         query_name = queries_result["data"][0]["name"]
 
-        result = await get_query_schema_tool.fn(
+        result = get_query_schema_tool.fn(
             name=query_name, app_name="blog", response_type="sdl"
         )
 
@@ -198,18 +188,17 @@ class TestMultiAppTools:
         assert "sdl" in result["data"]
         assert query_name in result["data"]["sdl"]
 
-    @pytest.mark.asyncio
-    async def test_get_query_schema_introspection_format(self, multi_app_mcp):
+    def test_get_query_schema_introspection_format(self, multi_app_mcp):
         """Test get_query_schema tool with introspection format."""
         tools = multi_app_mcp._tool_manager._tools
         get_query_schema_tool = tools.get("get_query_schema")
 
         # First get the list of queries to find a valid query name
         list_queries_tool = tools.get("list_queries")
-        queries_result = await list_queries_tool.fn(app_name="blog")
+        queries_result = list_queries_tool.fn(app_name="blog")
         query_name = queries_result["data"][0]["name"]
 
-        result = await get_query_schema_tool.fn(
+        result = get_query_schema_tool.fn(
             name=query_name, app_name="blog", response_type="introspection"
         )
 
@@ -217,31 +206,29 @@ class TestMultiAppTools:
         assert "operation" in result["data"]
         assert "types" in result["data"]
 
-    @pytest.mark.asyncio
-    async def test_get_query_schema_invalid_query(self, multi_app_mcp):
+    def test_get_query_schema_invalid_query(self, multi_app_mcp):
         """Test get_query_schema tool with an invalid query name."""
         tools = multi_app_mcp._tool_manager._tools
         get_query_schema_tool = tools.get("get_query_schema")
 
-        result = await get_query_schema_tool.fn(
+        result = get_query_schema_tool.fn(
             name="nonexistent_query", app_name="blog", response_type="sdl"
         )
 
         assert result["success"] is False
         assert "not found" in result["error"]
 
-    @pytest.mark.asyncio
-    async def test_get_mutation_schema_sdl_format(self, multi_app_mcp):
+    def test_get_mutation_schema_sdl_format(self, multi_app_mcp):
         """Test get_mutation_schema tool with SDL format."""
         tools = multi_app_mcp._tool_manager._tools
         get_mutation_schema_tool = tools.get("get_mutation_schema")
 
         # First get the list of mutations to find a valid mutation name
         list_mutations_tool = tools.get("list_mutations")
-        mutations_result = await list_mutations_tool.fn(app_name="shop")
+        mutations_result = list_mutations_tool.fn(app_name="shop")
         mutation_name = mutations_result["data"][0]["name"]
 
-        result = await get_mutation_schema_tool.fn(
+        result = get_mutation_schema_tool.fn(
             name=mutation_name, app_name="shop", response_type="sdl"
         )
 
@@ -256,11 +243,11 @@ class TestMultiAppTools:
         graphql_query_tool = tools.get("graphql_query")
 
         result = await graphql_query_tool.fn(
-            query="{ __typename }", app_name="blog"
+            query="{ get_blog_users(limit: 1) { id } }", app_name="blog"
         )
 
         assert result["success"] is True
-        assert result["data"]["__typename"] == "Query"
+        assert "get_blog_users" in result["data"]
 
     @pytest.mark.asyncio
     async def test_graphql_query_with_invalid_app(self, multi_app_mcp):
@@ -293,11 +280,11 @@ class TestMultiAppTools:
         graphql_mutation_tool = tools.get("graphql_mutation")
 
         result = await graphql_mutation_tool.fn(
-            query="{ __typename }", app_name="shop"
+            mutation='mutation { create_shop_product(name: "Test", price: 10) { id name } }', app_name="shop"
         )
 
         assert result["success"] is True
-        assert result["data"]["__typename"] == "Mutation"
+        assert "create_shop_product" in result["data"]
 
     @pytest.mark.asyncio
     async def test_graphql_mutation_with_invalid_app(self, multi_app_mcp):
@@ -306,7 +293,7 @@ class TestMultiAppTools:
         graphql_mutation_tool = tools.get("graphql_mutation")
 
         result = await graphql_mutation_tool.fn(
-            query="{ __typename }", app_name="nonexistent"
+            mutation='mutation { test { id } }', app_name="nonexistent"
         )
 
         assert result["success"] is False
@@ -318,22 +305,21 @@ class TestMultiAppTools:
         tools = multi_app_mcp._tool_manager._tools
         graphql_mutation_tool = tools.get("graphql_mutation")
 
-        result = await graphql_mutation_tool.fn(query="", app_name="shop")
+        result = await graphql_mutation_tool.fn(mutation="", app_name="shop")
 
         assert result["success"] is False
         assert "required" in result["error"].lower()
 
-    @pytest.mark.asyncio
-    async def test_apps_are_isolated(self, multi_app_mcp):
+    def test_apps_are_isolated(self, multi_app_mcp):
         """Test that queries to different apps return different schemas."""
         tools = multi_app_mcp._tool_manager._tools
 
         # Get queries from blog app
         list_queries_tool = tools.get("list_queries")
-        blog_queries = await list_queries_tool.fn(app_name="blog")
+        blog_queries = list_queries_tool.fn(app_name="blog")
 
         # Get queries from shop app
-        shop_queries = await list_queries_tool.fn(app_name="shop")
+        shop_queries = list_queries_tool.fn(app_name="shop")
 
         # They should have different queries
         blog_query_names = [q["name"] for q in blog_queries["data"]]
