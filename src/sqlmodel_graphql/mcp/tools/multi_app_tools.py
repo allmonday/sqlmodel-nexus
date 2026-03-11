@@ -206,7 +206,10 @@ def register_multi_app_tools(mcp: FastMCP, manager: MultiAppManager) -> None:
                         MCPErrors.TYPE_NOT_FOUND,
                     )
                 result = create_success_response({"sdl": sdl})
-                result["hint"] = f"Ready to execute query on app '{app_name}'. Use graphql_query(query=..., app_name='{app_name}')"
+                result["hint"] = (
+                    f"Ready to execute query on app '{app_name}'. "
+                    f"Use graphql_query(query=..., app_name='{app_name}')"
+                )
                 return result
 
             # Introspection format
@@ -228,7 +231,10 @@ def register_multi_app_tools(mcp: FastMCP, manager: MultiAppManager) -> None:
                     "types": types,
                 }
             )
-            result["hint"] = f"Ready to execute query on app '{app_name}'. Use graphql_query(query=..., app_name='{app_name}')"
+            result["hint"] = (
+                f"Ready to execute query on app '{app_name}'. "
+                f"Use graphql_query(query=..., app_name='{app_name}')"
+            )
             return result
         except ValueError as e:
             return create_error_response(str(e), MCPErrors.APP_NOT_FOUND)
@@ -356,7 +362,10 @@ def register_multi_app_tools(mcp: FastMCP, manager: MultiAppManager) -> None:
                     "; ".join(error_messages),
                     MCPErrors.QUERY_EXECUTION_ERROR,
                 )
-                error_response["hint"] = f"Error occurred on app '{app_name}'. Use the same app_name='{app_name}' for retry."
+                error_response["hint"] = (
+                    f"Error occurred on app '{app_name}'. "
+                    f"Use the same app_name='{app_name}' for retry."
+                )
                 return error_response
 
             # Success - add reminder about app_name for future calls
@@ -393,7 +402,8 @@ def register_multi_app_tools(mcp: FastMCP, manager: MultiAppManager) -> None:
         Examples:
             # Create mutation
             graphql_mutation(
-                mutation='mutation { createUser(name: "Alice", email: "alice@example.com") { id name } }',
+                mutation='mutation { createUser(name: "Alice", '
+                         'email: "alice@example.com") { id name } }',
                 app_name="blog"
             )
 
@@ -421,7 +431,10 @@ def register_multi_app_tools(mcp: FastMCP, manager: MultiAppManager) -> None:
                     "; ".join(error_messages),
                     MCPErrors.MUTATION_EXECUTION_ERROR,
                 )
-                error_response["hint"] = f"Error occurred on app '{app_name}'. Use the same app_name='{app_name}' for retry."
+                error_response["hint"] = (
+                    f"Error occurred on app '{app_name}'. "
+                    f"Use the same app_name='{app_name}' for retry."
+                )
                 return error_response
 
             # Success - add reminder about app_name for future calls

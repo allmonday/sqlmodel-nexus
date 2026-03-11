@@ -47,10 +47,12 @@ def register_graphql_mutation_tool(mcp: FastMCP, handler: GraphQLHandler) -> Non
 
         Examples:
             # Create a user
-            graphql_mutation(query="mutation { createUser(name: \\"John\\", email: \\"john@example.com\\") { id name email } }")
+            graphql_mutation(query="mutation { createUser(name: \\"John\\", "
+                         "email: \\"john@example.com\\") { id name email } }")
 
             # Create a post with nested author info
-            graphql_mutation(query="mutation { createPost(title: \\"Hello\\", content: \\"World\\", author_id: 1) { id title author { name } } }")
+            graphql_mutation(query="mutation { createPost(title: \\"Hello\\", "
+                         "content: \\"World\\", author_id: 1) { id title author { name } } }")
         """
         try:
             # Validate input

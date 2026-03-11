@@ -104,36 +104,20 @@ class User(BaseEntity, table=True):
         from demo.database import async_session
 
         async with async_session() as session:
-            # Check if user exists
-            user_result = await session.exec(select(cls).where(cls.id == user_id))
-            user = user_result.first()
+            # Get user
+            user = await session.get(cls, user_id)
             if not user:
                 raise ValueError("User not found")
 
-            # Check if post exists
-            post_result = await session.exec(select(Post).where(Post.id == post_id))
-            post = post_result.first()
+            # Get post
+            post = await session.get(Post, post_id)
             if not post:
                 raise ValueError("Post not found")
 
-            # Check if already favorited
-            existing_favorite = await session.exec(
-                select(UserFavoritePost).where(
-                    UserFavoritePost.user_id == user_id,
-                    UserFavoritePost.post_id == post_id,
-                )
-            )
-            if existing_favorite.first():
-                # Return user with relationships loaded
-                stmt = select(cls).where(cls.id == user_id)
-                stmt = stmt.options(*query_meta.to_options(cls))
-                result = await session.exec(stmt)
-                return result.first()
-
-            # Create favorite relationship
-            favorite = UserFavoritePost(user_id=user_id, post_id=post_id)
-            session.add(favorite)
-            await session.commit()
+            # Check if already favorited (idempotent)
+            if post not in user.favorite_posts:
+                user.favorite_posts.append(post)
+                await session.commit()
 
             # Return user with relationships loaded
             stmt = select(cls).where(cls.id == user_id)
@@ -147,15 +131,16 @@ class User(BaseEntity, table=True):
         from demo.database import async_session
 
         async with async_session() as session:
-            existing = await session.exec(
-                select(UserFavoritePost).where(
-                    UserFavoritePost.user_id == user_id,
-                    UserFavoritePost.post_id == post_id,
-                )
-            )
-            favorite = existing.first()
-            if favorite:
-                await session.delete(favorite)
+            user = await session.get(cls, user_id)
+            if not user:
+                return False
+
+            post = await session.get(Post, post_id)
+            if not post:
+                return False
+
+            if post in user.favorite_posts:
+                user.favorite_posts.remove(post)
                 await session.commit()
                 return True
             return False

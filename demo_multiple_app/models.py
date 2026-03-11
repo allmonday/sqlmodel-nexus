@@ -13,7 +13,6 @@ from sqlmodel import Field, Relationship, SQLModel, select
 
 from sqlmodel_graphql import QueryMeta, mutation, query
 
-
 # =============================================================================
 # Blog Application Models
 # =============================================================================
@@ -28,7 +27,7 @@ class BlogBaseEntity(SQLModel):
 class User(BlogBaseEntity, table=True):
     """User entity in the Blog application."""
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     email: str = Field(unique=True, index=True)
 
@@ -82,13 +81,13 @@ class User(BlogBaseEntity, table=True):
 class Post(BlogBaseEntity, table=True):
     """Post entity in the Blog application."""
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     title: str = Field(index=True)
     content: str
     author_id: int = Field(foreign_key="user.id")
 
     # Relationships
-    author: Optional[User] = Relationship(back_populates="posts")
+    author: User | None = Relationship(back_populates="posts")
 
     @query(name="posts", description="Get all posts with optional limit")
     async def get_all(
@@ -117,7 +116,9 @@ class Post(BlogBaseEntity, table=True):
             return result.first()
 
     @mutation(name="create_post", description="Create a new post")
-    async def create(cls, title: str, content: str, author_id: int, query_meta: QueryMeta) -> "Post":
+    async def create(
+        cls, title: str, content: str, author_id: int, query_meta: QueryMeta
+    ) -> "Post":
         """Create a new post."""
         from .database import get_blog_session
 
@@ -153,7 +154,7 @@ class ShopBaseEntity(SQLModel):
 class Product(ShopBaseEntity, table=True):
     """Product entity in the Shop application."""
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     price: float = Field(gt=0)
     stock: int = Field(ge=0, default=0)
@@ -188,7 +189,9 @@ class Product(ShopBaseEntity, table=True):
             return result.first()
 
     @mutation(name="create_product", description="Create a new product")
-    async def create(cls, name: str, price: float, stock: int = 0, query_meta: QueryMeta = None) -> "Product":
+    async def create(
+        cls, name: str, price: float, stock: int = 0, query_meta: QueryMeta = None
+    ) -> "Product":
         """Create a new product."""
         from .database import get_shop_session
 
@@ -209,7 +212,7 @@ class Product(ShopBaseEntity, table=True):
 class Order(ShopBaseEntity, table=True):
     """Order entity in the Shop application."""
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     customer_name: str = Field(index=True)
     total_amount: float = Field(default=0)
 
@@ -263,15 +266,15 @@ class Order(ShopBaseEntity, table=True):
 class OrderItem(ShopBaseEntity, table=True):
     """OrderItem entity in the Shop application."""
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     order_id: int = Field(foreign_key="order.id")
     product_id: int = Field(foreign_key="product.id")
     quantity: int = Field(gt=0)
     unit_price: float
 
     # Relationships
-    order: Optional[Order] = Relationship(back_populates="items")
-    product: Optional[Product] = Relationship(back_populates="order_items")
+    order: Order | None = Relationship(back_populates="items")
+    product: Product | None = Relationship(back_populates="order_items")
 
     @mutation(name="add_order_item", description="Add an item to an order")
     async def create(

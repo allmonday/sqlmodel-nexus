@@ -56,7 +56,9 @@ class ShopProduct(ShopBaseEntity, table=True):
         return []
 
     @mutation
-    async def create_shop_product(cls, name: str, description: str = "", query_meta=None) -> "ShopProduct":
+    async def create_shop_product(
+        cls, name: str, description: str = "", query_meta=None
+    ) -> "ShopProduct":
         """Create a shop product."""
         return ShopProduct(name=name, description=description)
 
@@ -280,7 +282,9 @@ class TestMultiAppTools:
         graphql_mutation_tool = tools.get("graphql_mutation")
 
         result = await graphql_mutation_tool.fn(
-            mutation='mutation { create_shop_product(name: "Test", description: "A product") { id name } }', app_name="shop"
+            mutation='mutation { create_shop_product(name: "Test", '
+                     'description: "A product") { id name } }',
+            app_name="shop",
         )
 
         assert result["success"] is True

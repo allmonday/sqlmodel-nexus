@@ -64,7 +64,8 @@ def register_get_operation_schema_tools(
             {
                 "success": true,
                 "data": {
-                    "sdl": "# Query\\nusers(limit: Int): [User!]!\\n\\n# Related Types\\ntype User { ... }"
+                    "sdl": "# Query\\nusers(limit: Int): [User!]!\\n\\n"
+                    "# Related Types\\ntype User { ... }"
                 }
             }
 
@@ -143,7 +144,8 @@ def register_get_operation_schema_tools(
             {
                 "success": true,
                 "data": {
-                    "sdl": "# Mutation\\ncreateUser(name: String!, email: String!): User!\\n\\n# Related Types\\ntype User { ... }"
+                    "sdl": "# Mutation\\ncreateUser(name: String!, email: String!): User!\\n\\n"
+                    "# Related Types\\ntype User { ... }"
                 }
             }
 
