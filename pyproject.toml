@@ -1,6 +1,6 @@
 [project]
 name = "sqlmodel-graphql"
-version = "0.8.0"
+version = "0.8.1"
 description = "GraphQL SDL generation and query optimization for SQLModel"
 authors = [{ name = "tangkikodo", email = "allmonday@126.com" }]
 readme = "README.md"
