@@ -247,3 +247,96 @@ class TestMultiAppManager:
         # Verify that the handler was created successfully with custom descriptions
         # The descriptions are passed to the introspection generator and SDL generator
         assert app.handler is not None
+
+    def test_get_app_with_underscore_app_suffix(self):
+        """Test that get_app handles '_app' suffix intelligently."""
+        apps: list[AppConfig] = [
+            {
+                "name": "todo",
+                "base": MockBaseEntity1,
+                "description": "Todo application",
+            }
+        ]
+
+        manager = MultiAppManager(apps)
+
+        # Should find "todo" when given "todo_app"
+        app = manager.get_app("todo_app")
+        assert app.name == "todo"
+        assert app.description == "Todo application"
+
+    def test_get_app_with_dash_app_suffix(self):
+        """Test that get_app handles '-app' suffix intelligently."""
+        apps: list[AppConfig] = [
+            {
+                "name": "blog",
+                "base": MockBaseEntity1,
+                "description": "Blog application",
+            }
+        ]
+
+        manager = MultiAppManager(apps)
+
+        # Should find "blog" when given "blog-app"
+        app = manager.get_app("blog-app")
+        assert app.name == "blog"
+        assert app.description == "Blog application"
+
+    def test_get_app_exact_match_priority(self):
+        """Test that exact match takes priority over suffix normalization."""
+        apps: list[AppConfig] = [
+            {
+                "name": "test_app",
+                "base": MockBaseEntity1,
+                "description": "App with _app in name",
+            },
+            {
+                "name": "test",
+                "base": MockBaseEntity2,
+                "description": "App without suffix",
+            }
+        ]
+
+        manager = MultiAppManager(apps)
+
+        # Should return exact match "test_app", not "test"
+        app = manager.get_app("test_app")
+        assert app.name == "test_app"
+        assert app.description == "App with _app in name"
+
+    def test_get_app_suffix_normalization_fallback(self):
+        """Test that suffix normalization works as fallback when exact match fails."""
+        apps: list[AppConfig] = [
+            {
+                "name": "shop",
+                "base": MockBaseEntity1,
+                "description": "Shop application",
+            }
+        ]
+
+        manager = MultiAppManager(apps)
+
+        # "shop_app" doesn't exist exactly, so it should try "shop"
+        app = manager.get_app("shop_app")
+        assert app.name == "shop"
+        assert app.description == "Shop application"
+
+    def test_get_app_still_raises_error_for_invalid_names(self):
+        """Test that get_app still raises ValueError for truly invalid names."""
+        apps: list[AppConfig] = [
+            {
+                "name": "todo",
+                "base": MockBaseEntity1,
+                "description": "Todo application",
+            }
+        ]
+
+        manager = MultiAppManager(apps)
+
+        # "invalid_name" should still raise ValueError
+        with pytest.raises(ValueError) as exc_info:
+            manager.get_app("invalid_name")
+
+        assert "App 'invalid_name' not found" in str(exc_info.value)
+        assert "Available apps: ['todo']" in str(exc_info.value)
+

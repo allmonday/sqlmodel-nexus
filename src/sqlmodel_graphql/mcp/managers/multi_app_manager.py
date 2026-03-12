@@ -92,12 +92,26 @@ class MultiAppManager:
             queries = app.tracer.list_operation_fields("Query")
             ```
         """
-        if name not in self.apps:
-            available = list(self.apps.keys())
-            raise ValueError(
-                f"App '{name}' not found. Available apps: {available}"
-            )
-        return self.apps[name]
+        # Try exact match first
+        if name in self.apps:
+            return self.apps[name]
+
+        # Smart fallback: try removing common suffixes
+        # Handle cases like "todos_app" -> "todos", "blog_app" -> "blog"
+        normalized_name = name
+        if normalized_name.endswith("_app"):
+            normalized_name = normalized_name[:-4]  # Remove "_app"
+        elif normalized_name.endswith("-app"):
+            normalized_name = normalized_name[:-4]  # Remove "-app"
+
+        if normalized_name in self.apps:
+            return self.apps[normalized_name]
+
+        # No match found, provide helpful error message
+        available = list(self.apps.keys())
+        raise ValueError(
+            f"App '{name}' not found. Available apps: {available}"
+        )
 
     def list_apps(self) -> list[str]:
         """List all available application names.
