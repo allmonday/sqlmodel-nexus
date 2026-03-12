@@ -245,11 +245,11 @@ class TestMultiAppTools:
         graphql_query_tool = tools.get("graphql_query")
 
         result = await graphql_query_tool.fn(
-            query="{ get_blog_users(limit: 1) { id } }", app_name="blog"
+            query="{ blogUserGetBlogUsers(limit: 1) { id } }", app_name="blog"
         )
 
         assert result["success"] is True
-        assert "get_blog_users" in result["data"]
+        assert "blogUserGetBlogUsers" in result["data"]
 
     @pytest.mark.asyncio
     async def test_graphql_query_with_invalid_app(self, multi_app_mcp):
@@ -282,13 +282,13 @@ class TestMultiAppTools:
         graphql_mutation_tool = tools.get("graphql_mutation")
 
         result = await graphql_mutation_tool.fn(
-            mutation='mutation { create_shop_product(name: "Test", '
+            mutation='mutation { shopProductCreateShopProduct(name: "Test", '
                      'description: "A product") { id name } }',
             app_name="shop",
         )
 
         assert result["success"] is True
-        assert "create_shop_product" in result["data"]
+        assert "shopProductCreateShopProduct" in result["data"]
 
     @pytest.mark.asyncio
     async def test_graphql_mutation_with_invalid_app(self, multi_app_mcp):
