@@ -125,6 +125,41 @@ class TestInputTypesIntrospection:
         assert "name" in field_names
         assert "email" in field_names
 
+    def test_mutation_parameter_with_input_type(self) -> None:
+        """Test that mutation parameters using Input types are correctly identified."""
+        handler = GraphQLHandler(base=InputTestBase)
+        schema = handler._introspection_generator.generate()
+
+        # Find the Mutation type
+        mutation_type = next(
+            (t for t in schema["types"] if t["name"] == "Mutation"), None
+        )
+        assert mutation_type is not None
+
+        # Find the create mutation field
+        create_field = next(
+            (f for f in mutation_type["fields"] if f["name"] == "inputTestUserCreate"),
+            None
+        )
+        assert create_field is not None
+
+        # Check the args
+        assert len(create_field["args"]) > 0
+        input_arg = next(
+            (a for a in create_field["args"] if a["name"] == "input"),
+            None
+        )
+        assert input_arg is not None
+
+        # Verify the type reference structure
+        type_ref = input_arg["type"]
+        # Should be NON_NULL(INPUT_OBJECT(UserCreateInput))
+        assert type_ref["kind"] == "NON_NULL"
+        assert type_ref["name"] is None
+        assert type_ref["ofType"]["kind"] == "INPUT_OBJECT"
+        assert type_ref["ofType"]["name"] == "UserCreateInput"
+        assert type_ref["ofType"]["ofType"] is None
+
 
 class TestInputTypesExecution:
     """Test Input type execution."""

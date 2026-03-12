@@ -359,6 +359,16 @@ class IntrospectionGenerator:
                 }
             return {"kind": "OBJECT", "name": entity_name, "ofType": None}
 
+        # Input types
+        if hasattr(python_type, "__name__") and python_type.__name__ in self._input_types:
+            if required:
+                return {
+                    "kind": "NON_NULL",
+                    "name": None,
+                    "ofType": {"kind": "INPUT_OBJECT", "name": python_type.__name__, "ofType": None},
+                }
+            return {"kind": "INPUT_OBJECT", "name": python_type.__name__, "ofType": None}
+
         # Default to String
         if required:
             return {
