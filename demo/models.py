@@ -13,6 +13,22 @@ class BaseEntity(SQLModel):
     pass
 
 
+# Input types for mutations
+class CreateUserInput(SQLModel):
+    """Input type for creating a new user."""
+
+    name: str
+    email: str
+
+
+class CreatePostInput(SQLModel):
+    """Input type for creating a new post."""
+
+    title: str
+    content: str
+    author_id: int
+
+
 class UserFavoritePost(BaseEntity, table=True):
     """User-Post favorite relationship (many-to-many link table).
 
@@ -85,6 +101,35 @@ class User(BaseEntity, table=True):
                 return result.first()
 
             user = cls(name=name, email=email)
+            session.add(user)
+            await session.commit()
+            await session.refresh(user)
+
+            # Re-query with query_meta to load relationships
+            stmt = select(cls).where(cls.id == user.id)
+            if query_meta:
+                stmt = stmt.options(*query_meta.to_options(cls))
+            result = await session.exec(stmt)
+            return result.first()
+
+    @mutation
+    async def create_user_with_input(
+        cls, input: CreateUserInput, query_meta: QueryMeta | None = None
+    ) -> "User":
+        """Create a new user using Input type (idempotent)."""
+        from demo.database import async_session
+
+        async with async_session() as session:
+            # Idempotency check: return existing user if email already exists
+            existing = await session.exec(select(cls).where(cls.email == input.email))
+            if existing.first():
+                stmt = select(cls).where(cls.id == existing.first().id)
+                if query_meta:
+                    stmt = stmt.options(*query_meta.to_options(cls))
+                result = await session.exec(stmt)
+                return result.first()
+
+            user = cls(name=input.name, email=input.email)
             session.add(user)
             await session.commit()
             await session.refresh(user)
@@ -225,6 +270,37 @@ class Post(BaseEntity, table=True):
                 return result.first()
 
             post = cls(title=title, content=content, author_id=author_id)
+            session.add(post)
+            await session.commit()
+            await session.refresh(post)
+
+            # Re-query with query_meta to load relationships
+            stmt = select(cls).where(cls.id == post.id)
+            if query_meta:
+                stmt = stmt.options(*query_meta.to_options(cls))
+            result = await session.exec(stmt)
+            return result.first()
+
+    @mutation
+    async def create_post_with_input(
+        cls, input: CreatePostInput, query_meta: QueryMeta | None = None
+    ) -> "Post":
+        """Create a new post using Input type (idempotent)."""
+        from demo.database import async_session
+
+        async with async_session() as session:
+            # Idempotency check: return existing post if same title + author
+            existing = await session.exec(
+                select(cls).where(cls.title == input.title, cls.author_id == input.author_id)
+            )
+            if existing.first():
+                stmt = select(cls).where(cls.id == existing.first().id)
+                if query_meta:
+                    stmt = stmt.options(*query_meta.to_options(cls))
+                result = await session.exec(stmt)
+                return result.first()
+
+            post = cls(title=input.title, content=input.content, author_id=input.author_id)
             session.add(post)
             await session.commit()
             await session.refresh(post)

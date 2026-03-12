@@ -6,6 +6,7 @@ import inspect
 from enum import Enum
 from typing import TYPE_CHECKING, Any, get_args, get_origin, get_type_hints
 
+from pydantic import BaseModel
 from sqlmodel import SQLModel
 
 from sqlmodel_graphql.type_converter import TypeConverter
@@ -15,8 +16,55 @@ if TYPE_CHECKING:
     pass
 
 
+def _get_core_types(python_type: Any) -> list[type]:
+    """Extract core types from a type hint, unwrapping Optional, Union, list, etc."""
+    import types
+    from typing import Union
+
+    origin = get_origin(python_type)
+
+    # Handle Union (including Optional)
+    if origin is Union or origin is types.UnionType:
+        args = get_args(python_type)
+        result = []
+        for arg in args:
+            if arg is not type(None):
+                result.extend(_get_core_types(arg))
+        return result
+
+    # Handle list
+    if origin is list:
+        args = get_args(python_type)
+        if args:
+            return _get_core_types(args[0])
+        return []
+
+    # Base type
+    if isinstance(python_type, type):
+        return [python_type]
+
+    return []
+
+
+def _is_input_type(python_type: type) -> bool:
+    """Check if a type should be treated as a GraphQL Input type.
+
+    Input types are SQLModel or BaseModel subclasses that are NOT in the entity list
+    (i.e., they are used as mutation parameters, not as entity types).
+    """
+    if not isinstance(python_type, type):
+        return False
+    # Check if it's a SQLModel or Pydantic BaseModel
+    try:
+        if issubclass(python_type, SQLModel) or issubclass(python_type, BaseModel):
+            return True
+    except TypeError:
+        pass
+    return False
+
+
 def _python_type_to_graphql(
-    python_type: Any, converter: TypeConverter
+    python_type: Any, converter: TypeConverter, entity_names: set[str] | None = None
 ) -> str:
     """Convert Python type to GraphQL type string."""
     origin = get_origin(python_type)
@@ -25,21 +73,21 @@ def _python_type_to_graphql(
     if origin is list:
         args = get_args(python_type)
         if args:
-            inner_type = _python_type_to_graphql_inner(args[0], converter)
+            inner_type = _python_type_to_graphql_inner(args[0], converter, nullable=True, entity_names=entity_names)
             return f"[{inner_type}!]!"
         return "[String!]!"
 
     # Handle Optional
     if converter.is_optional(python_type):
         inner = converter.unwrap_optional(python_type)
-        return _python_type_to_graphql_inner(inner, converter)
+        return _python_type_to_graphql_inner(inner, converter, nullable=True, entity_names=entity_names)
 
     # Non-nullable type
-    return _python_type_to_graphql_inner(python_type, converter, nullable=False)
+    return _python_type_to_graphql_inner(python_type, converter, nullable=False, entity_names=entity_names)
 
 
 def _python_type_to_graphql_inner(
-    python_type: Any, converter: TypeConverter, nullable: bool = True
+    python_type: Any, converter: TypeConverter, nullable: bool = True, entity_names: set[str] | None = None
 ) -> str:
     """Convert Python type to GraphQL type string (inner, without list wrapper)."""
     # Handle enum types
@@ -50,6 +98,10 @@ def _python_type_to_graphql_inner(
     entity_name = converter.get_entity_name(python_type)
     if entity_name:
         return f"{entity_name}{'!' if not nullable else ''}"
+
+    # Check if it's an Input type (SQLModel or BaseModel not in entities)
+    if entity_names is not None and _is_input_type(python_type) and python_type.__name__ not in entity_names:
+        return f"{python_type.__name__}{'!' if not nullable else ''}"
 
     # Handle basic Python types
     base_type = converter.get_scalar_type_name(python_type) or "String"
@@ -87,11 +139,16 @@ class SDLGenerator:
         enum_defs = self._generate_enums()
         parts.extend(enum_defs)
 
-        # 2. Generate entity types
+        # 2. Collect and generate Input types
+        input_types = self._collect_input_types()
+        for input_type in sorted(input_types, key=lambda t: t.__name__):
+            parts.append(self._generate_input_type(input_type))
+
+        # 3. Generate entity types
         for entity in self.entities:
             parts.append(self._generate_type(entity))
 
-        # 3. Generate Query type
+        # 4. Generate Query type
         query_fields = self._collect_query_fields()
         if query_fields:
             query_def = f"type Query {{\n{chr(10).join(query_fields)}\n}}"
@@ -99,7 +156,7 @@ class SDLGenerator:
                 query_def = f'"""{self._query_description}"""\n{query_def}'
             parts.append(query_def)
 
-        # 4. Generate Mutation type
+        # 5. Generate Mutation type
         mutation_fields = self._collect_mutation_fields()
         if mutation_fields:
             mutation_def = f"type Mutation {{\n{chr(10).join(mutation_fields)}\n}}"
@@ -125,6 +182,132 @@ class SDLGenerator:
             result.append(f"enum {enum_name} {{\n{values}\n}}")
 
         return result
+
+    def _collect_input_types(self) -> set[type]:
+        """Collect all Input types from query and mutation parameters.
+
+        Input types are SQLModel or BaseModel subclasses that are NOT in the entity list.
+        They are used as parameters in query/mutation methods.
+        """
+        input_types: set[type] = set()
+        visited: set[str] = set()
+
+        def collect_from_type(param_type: Any) -> None:
+            """Recursively collect Input types from a type hint."""
+            core_types = _get_core_types(param_type)
+
+            for core_type in core_types:
+                if _is_input_type(core_type) and core_type.__name__ not in self._entity_names:
+                    type_name = core_type.__name__
+                    if type_name not in visited:
+                        visited.add(type_name)
+                        input_types.add(core_type)
+
+                        # Recursively collect nested types
+                        try:
+                            type_hints = get_type_hints(core_type)
+                            for field_type in type_hints.values():
+                                collect_from_type(field_type)
+                        except Exception:
+                            pass
+
+        # Scan all query and mutation methods
+        for entity in self.entities:
+            for name in dir(entity):
+                try:
+                    attr = getattr(entity, name)
+                    if not callable(attr):
+                        continue
+                    func = attr.__func__ if hasattr(attr, "__func__") else attr
+
+                    # Check for @query or @mutation
+                    if hasattr(func, "_graphql_query") or hasattr(func, "_graphql_mutation"):
+                        sig = inspect.signature(func)
+                        try:
+                            globalns = getattr(func, "__globals__", {})
+                            localns = {e.__name__: e for e in self.entities}
+                            hints = get_type_hints(func, globalns=globalns, localns=localns)
+                        except Exception:
+                            hints = {}
+
+                        for param_name, param in sig.parameters.items():
+                            if param_name in ("cls", "self", "query_meta"):
+                                continue
+                            if param_name in hints:
+                                collect_from_type(hints[param_name])
+                except Exception:
+                    continue
+
+        return input_types
+
+    def _generate_input_type(self, input_type: type) -> str:
+        """Generate GraphQL input type definition from a SQLModel or BaseModel class."""
+        fields: list[str] = []
+
+        # Get model_fields if available (SQLModel/Pydantic)
+        model_fields = getattr(input_type, "model_fields", {})
+
+        # Only use model_fields, not type hints (to avoid SQLModel internal fields like 'metadata')
+        for field_name, field_info in model_fields.items():
+            if field_name.startswith("_"):
+                continue
+
+            # Skip SQLModel internal fields
+            if field_name == "metadata":
+                continue
+
+            # Get the annotation from field_info
+            field_type = field_info.annotation
+
+            # Convert type to GraphQL
+            gql_type = self._input_type_to_graphql(field_type, field_info)
+
+            # Add field description if available
+            if field_info and getattr(field_info, "description", None):
+                fields.append(f'  """{field_info.description}"""')
+
+            fields.append(f"  {field_name}: {gql_type}")
+
+        # Build input type definition with optional description
+        type_def = f"input {input_type.__name__} {{\n{chr(10).join(fields)}\n}}"
+        if input_type.__doc__:
+            type_def = f'"""{input_type.__doc__}"""\n{type_def}'
+        return type_def
+
+    def _input_type_to_graphql(self, python_type: Any, field_info: Any = None, is_optional: bool = False) -> str:
+        """Convert Python type to GraphQL type string for Input types."""
+        origin = get_origin(python_type)
+
+        # Handle list types
+        if origin is list:
+            args = get_args(python_type)
+            if args:
+                inner_type = self._input_type_to_graphql(args[0])
+                return f"[{inner_type}!]!"
+            return "[String!]!"
+
+        # Handle Optional
+        if self._converter.is_optional(python_type):
+            inner = self._converter.unwrap_optional(python_type)
+            # Don't add ! for optional types
+            return self._input_type_to_graphql(inner, is_optional=True)
+
+        # Handle enum types
+        if self._converter.is_enum_type(python_type):
+            return python_type.__name__
+
+        # Check if it's another Input type (SQLModel or BaseModel not in entities)
+        if _is_input_type(python_type) and python_type.__name__ not in self._entity_names:
+            return f"{python_type.__name__}" if is_optional else f"{python_type.__name__}!"
+
+        # Check if it's an entity type
+        entity_name = self._converter.get_entity_name(python_type)
+        if entity_name:
+            return entity_name if is_optional else f"{entity_name}!"
+
+        # Handle basic Python types
+        base_type = self._converter.get_scalar_type_name(python_type) or "String"
+        return base_type if is_optional else f"{base_type}!"
 
     def _generate_type(self, entity: type[SQLModel]) -> str:
         """Generate GraphQL type definition from SQLModel class."""
@@ -263,7 +446,7 @@ class SDLGenerator:
                 continue
 
             if param_name in hints:
-                gql_type = _python_type_to_graphql(hints[param_name], self._converter)
+                gql_type = _python_type_to_graphql(hints[param_name], self._converter, self._entity_names)
                 # Parameters are nullable by default if they have defaults
                 if param.default != inspect.Parameter.empty:
                     # Remove the ! for optional parameters
@@ -275,7 +458,7 @@ class SDLGenerator:
         # Get return type
         return_type = hints.get("return", inspect.Signature.empty)
         if return_type != inspect.Signature.empty:
-            return_gql_type = _python_type_to_graphql(return_type, self._converter)
+            return_gql_type = _python_type_to_graphql(return_type, self._converter, self._entity_names)
         else:
             return_gql_type = "String!"
 

@@ -35,11 +35,13 @@ class SchemaFormatter:
             - queries: List of available query operations
             - mutations: List of available mutation operations
             - types: List of entity types with their fields
+            - input_types: List of input types with their fields
         """
         return {
             "queries": self._get_queries(),
             "mutations": self._get_mutations(),
             "types": self._get_types(),
+            "input_types": self._get_input_types(),
         }
 
     def _get_queries(self) -> list[dict[str, Any]]:
@@ -82,6 +84,43 @@ class SchemaFormatter:
                 types.append(self._format_type(type_info))
 
         return types
+
+    def _get_input_types(self) -> list[dict[str, Any]]:
+        """Extract input types from schema."""
+        input_types: list[dict[str, Any]] = []
+
+        for type_info in self._introspection.get("types", []):
+            if type_info.get("kind") == "INPUT_OBJECT":
+                input_types.append(self._format_input_type(type_info))
+
+        return input_types
+
+    def _format_input_type(self, type_info: dict[str, Any]) -> dict[str, Any]:
+        """Format an input type for AI consumption.
+
+        Args:
+            type_info: The introspection type data.
+
+        Returns:
+            Simplified input type dictionary.
+        """
+        input_fields = type_info.get("inputFields", [])
+
+        fields = [
+            {
+                "name": field.get("name"),
+                "type": self._simplify_type_ref(field.get("type")),
+                "required": self._is_required(field.get("type")),
+                "description": field.get("description"),
+            }
+            for field in input_fields
+        ]
+
+        return {
+            "name": type_info.get("name"),
+            "description": type_info.get("description"),
+            "fields": fields,
+        }
 
     def _format_field(self, field: dict[str, Any]) -> dict[str, Any]:
         """Format a field (query/mutation) for AI consumption.

@@ -204,8 +204,9 @@ class GraphQLHandler:
                             entity, method = method_info
 
                             # Build arguments
+                            entity_names = {e.__name__ for e in self.entities}
                             args = argument_builder.build_arguments(
-                                selection, variables, method, entity
+                                selection, variables, method, entity, entity_names
                             )
 
                             # Add query_meta if available

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any
+from typing import Any, get_type_hints
 
 
 class ArgumentBuilder:
@@ -47,12 +47,51 @@ class ArgumentBuilder:
         # Fallback - return the node itself
         return node
 
+    def _is_input_type(self, python_type: type, entity_names: set[str]) -> bool:
+        """Check if a type should be treated as a GraphQL Input type."""
+        if not isinstance(python_type, type):
+            return False
+        # Skip if it's an entity type
+        if python_type.__name__ in entity_names:
+            return False
+        try:
+            from pydantic import BaseModel
+            from sqlmodel import SQLModel
+            if issubclass(python_type, SQLModel) or issubclass(python_type, BaseModel):
+                return True
+        except TypeError:
+            pass
+        return False
+
+    def _convert_to_input_model(
+        self, value: Any, target_type: type, entity_names: set[str]
+    ) -> Any:
+        """Convert a dict value to an Input model instance if needed."""
+        if not isinstance(value, dict):
+            return value
+        if not self._is_input_type(target_type, entity_names):
+            return value
+
+        # Recursively convert nested dict values
+        model_fields = getattr(target_type, "model_fields", {})
+        converted = {}
+        for key, val in value.items():
+            if key in model_fields:
+                field_info = model_fields[key]
+                field_type = field_info.annotation
+                converted[key] = self._convert_to_input_model(val, field_type, entity_names)
+            else:
+                converted[key] = val
+
+        return target_type(**converted)
+
     def build_arguments(
         self,
         selection: Any,
         variables: dict[str, Any] | None,
         method: Any,
         entity: type,
+        entity_names: set[str] | None = None,
     ) -> dict[str, Any]:
         """Build method arguments from GraphQL field arguments.
 
@@ -61,19 +100,26 @@ class ArgumentBuilder:
             variables: GraphQL variables dict.
             method: The method to call.
             entity: The SQLModel entity class.
+            entity_names: Set of known entity class names.
 
         Returns:
             Dictionary of argument name to value.
         """
         args: dict[str, Any] = {}
         variables = variables or {}
+        entity_names = entity_names or set()
 
         if not selection.arguments:
             return args
 
-        # Get method signature for type info
+        # Get method signature and type hints
         func = method.__func__ if hasattr(method, "__func__") else method
         sig = inspect.signature(func)
+
+        try:
+            hints = get_type_hints(func)
+        except Exception:
+            hints = {}
 
         for arg in selection.arguments:
             arg_name = arg.name.value
@@ -89,10 +135,18 @@ class ArgumentBuilder:
             # Use argument name directly
             param_name = arg_name
 
-            # Check if this param exists in the method signature
+            # Determine the actual parameter name
+            actual_param_name = None
             if param_name in sig.parameters:
-                args[param_name] = value
+                actual_param_name = param_name
             elif arg_name in sig.parameters:
-                args[arg_name] = value
+                actual_param_name = arg_name
+
+            if actual_param_name:
+                # Convert to Input model if the parameter type is an Input type
+                if actual_param_name in hints:
+                    param_type = hints[actual_param_name]
+                    value = self._convert_to_input_model(value, param_type, entity_names)
+                args[actual_param_name] = value
 
         return args

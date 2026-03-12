@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import types
 from enum import Enum
 from typing import Any, Union, get_args, get_origin
 
@@ -32,7 +33,8 @@ class TypeConverter:
     def is_optional(self, type_hint: Any) -> bool:
         """Check if type hint is Optional[T] (Union with None)."""
         origin = get_origin(type_hint)
-        if origin is Union:
+        # Handle both Union (typing module) and UnionType (| syntax in Python 3.10+)
+        if origin is Union or origin is types.UnionType:
             args = get_args(type_hint)
             return type(None) in args
         return False
@@ -40,7 +42,8 @@ class TypeConverter:
     def unwrap_optional(self, type_hint: Any) -> Any:
         """Extract T from Optional[T]."""
         origin = get_origin(type_hint)
-        if origin is Union:
+        # Handle both Union (typing module) and UnionType (| syntax in Python 3.10+)
+        if origin is Union or origin is types.UnionType:
             args = get_args(type_hint)
             non_none = [a for a in args if a is not type(None)]
             return non_none[0] if non_none else type_hint
@@ -125,8 +128,8 @@ class TypeConverter:
             inner = self.get_list_inner_type(type_hint)
             return self.is_entity_type(inner)
 
-        # Handle Optional[Entity]
-        if origin is Union:
+        # Handle Optional[Entity] (Union or UnionType)
+        if origin is Union or origin is types.UnionType:
             args = get_args(type_hint)
             non_none = [a for a in args if a is not type(None)]
             if non_none:

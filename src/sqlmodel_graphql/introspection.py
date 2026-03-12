@@ -5,12 +5,14 @@ from __future__ import annotations
 import inspect
 from collections.abc import Callable
 from enum import Enum
-from typing import TYPE_CHECKING, Any, get_type_hints
+from typing import TYPE_CHECKING, Any, get_args, get_origin, get_type_hints
+
+from sqlmodel import SQLModel
 
 from sqlmodel_graphql.type_converter import TypeConverter
 
 if TYPE_CHECKING:
-    from sqlmodel import SQLModel
+    pass
 
 
 class IntrospectionGenerator:
@@ -46,6 +48,7 @@ class IntrospectionGenerator:
         # Initialize converter before _collect_enum_types which uses it
         self._converter = TypeConverter(self._entity_names)
         self._enum_types = self._collect_enum_types()
+        self._input_types = self._collect_input_types()
 
     def generate(self) -> dict[str, Any]:
         """Generate complete __schema introspection data."""
@@ -93,15 +96,19 @@ class IntrospectionGenerator:
         for enum_class in self._enum_types.values():
             types_list.append(self._build_enum_type(enum_class))
 
-        # 3. Entity types
+        # 3. Input types
+        for input_type in self._input_types.values():
+            types_list.append(self._build_input_type(input_type))
+
+        # 4. Entity types
         for entity in self.entities:
             types_list.append(self._build_entity_type(entity))
 
-        # 4. Query type
+        # 5. Query type
         if self._query_methods:
             types_list.append(self._build_query_type())
 
-        # 5. Mutation type
+        # 6. Mutation type
         if self._mutation_methods:
             types_list.append(self._build_mutation_type())
 
@@ -427,3 +434,110 @@ class IntrospectionGenerator:
                         enums[hint.__name__] = hint
 
         return enums
+
+    def _collect_input_types(self) -> dict[str, type]:
+        """Collect all Input types from query and mutation parameters."""
+        import types as types_module
+        from typing import Union
+
+        from pydantic import BaseModel
+
+        input_types: dict[str, type] = {}
+        visited: set[str] = set()
+
+        def get_core_types(python_type: Any) -> list[type]:
+            """Extract core types from a type hint."""
+            origin = get_origin(python_type)
+            if origin is Union or origin is types_module.UnionType:
+                args = get_args(python_type)
+                result = []
+                for arg in args:
+                    if arg is not type(None):
+                        result.extend(get_core_types(arg))
+                return result
+            if origin is list:
+                args = get_args(python_type)
+                if args:
+                    return get_core_types(args[0])
+                return []
+            if isinstance(python_type, type):
+                return [python_type]
+            return []
+
+        def is_input_type(python_type: type) -> bool:
+            """Check if a type should be treated as a GraphQL Input type."""
+            if not isinstance(python_type, type):
+                return False
+            try:
+                if issubclass(python_type, SQLModel) or issubclass(python_type, BaseModel):
+                    return True
+            except TypeError:
+                pass
+            return False
+
+        def collect_from_type(param_type: Any) -> None:
+            """Recursively collect Input types from a type hint."""
+            core_types = get_core_types(param_type)
+            for core_type in core_types:
+                if is_input_type(core_type) and core_type.__name__ not in self._entity_names:
+                    type_name = core_type.__name__
+                    if type_name not in visited:
+                        visited.add(type_name)
+                        input_types[type_name] = core_type
+                        # Recursively collect nested types
+                        try:
+                            type_hints = get_type_hints(core_type)
+                            for field_type in type_hints.values():
+                                collect_from_type(field_type)
+                        except Exception:
+                            pass
+
+        # Scan all query and mutation methods
+        for methods in [self._query_methods, self._mutation_methods]:
+            for _, (_, method) in methods.items():
+                func = method.__func__ if hasattr(method, "__func__") else method
+                sig = inspect.signature(func)
+                try:
+                    hints = get_type_hints(func)
+                except Exception:
+                    hints = {}
+
+                for param_name, param in sig.parameters.items():
+                    if param_name in ("cls", "self", "query_meta", "return"):
+                        continue
+                    if param_name in hints:
+                        collect_from_type(hints[param_name])
+
+        return input_types
+
+    def _build_input_type(self, input_type: type) -> dict:
+        """Build introspection data for an Input type."""
+        input_fields: list[dict] = []
+
+        # Get model_fields if available (SQLModel/Pydantic)
+        model_fields = getattr(input_type, "model_fields", {})
+
+        for field_name, field_info in model_fields.items():
+            if field_name.startswith("_") or field_name == "metadata":
+                continue
+
+            field_type = field_info.annotation
+            type_ref = self._build_type_ref(field_type, is_input=True, required=True)
+
+            input_fields.append({
+                "name": field_name,
+                "description": getattr(field_info, "description", None),
+                "type": type_ref,
+                "defaultValue": None,
+            })
+
+        return {
+            "kind": "INPUT_OBJECT",
+            "name": input_type.__name__,
+            "description": input_type.__doc__,
+            "fields": None,
+            "inputFields": input_fields,
+            "interfaces": None,
+            "enumValues": None,
+            "possibleTypes": None,
+        }
