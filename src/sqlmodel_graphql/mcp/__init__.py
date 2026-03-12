@@ -42,8 +42,15 @@ Example:
 
 from __future__ import annotations
 
-__all__ = ["create_mcp_server", "AppConfig", "MultiAppManager", "AppResources"]
+__all__ = [
+    "create_mcp_server",
+    "config_simple_mcp_server",
+    "AppConfig",
+    "MultiAppManager",
+    "SingleAppManager",
+    "AppResources",
+]
 
-from sqlmodel_graphql.mcp.managers import AppResources, MultiAppManager
-from sqlmodel_graphql.mcp.server import create_mcp_server
+from sqlmodel_graphql.mcp.managers import AppResources, MultiAppManager, SingleAppManager
+from sqlmodel_graphql.mcp.server import config_simple_mcp_server, create_mcp_server
 from sqlmodel_graphql.mcp.types.app_config import AppConfig

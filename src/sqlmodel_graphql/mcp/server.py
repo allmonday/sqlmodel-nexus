@@ -106,3 +106,88 @@ def create_mcp_server(
     register_multi_app_tools(mcp, manager)
 
     return mcp
+
+
+def config_simple_mcp_server(
+    base: type,
+    name: str = "SQLModel GraphQL API",
+    desc: str | None = None,
+) -> FastMCP:
+    """Create a simplified MCP server for single-app scenarios.
+
+    This function creates a FastMCP server with only 3 tools, eliminating
+    the complexity of multi-app management and progressive disclosure.
+    Perfect for simple GraphQL APIs with a single database.
+
+    **Tools provided:**
+    - get_schema: Get the complete GraphQL schema in SDL format
+    - graphql_query: Execute GraphQL queries
+    - graphql_mutation: Execute GraphQL mutations
+
+    All tools work without requiring an app_name parameter.
+
+    Args:
+        base: SQLModel base class. All subclasses with @query/@mutation
+              decorators will be automatically discovered.
+        name: Name of the MCP server (shown in MCP clients).
+        desc: Optional description for the GraphQL schema (used for both
+              Query and Mutation type descriptions).
+
+    Returns:
+        A configured FastMCP server instance with 3 simplified tools.
+
+    Example:
+        ```python
+        from sqlmodel import SQLModel
+        from sqlmodel_graphql import query
+        from sqlmodel_graphql.mcp import config_simple_mcp_server
+
+        class BaseEntity(SQLModel):
+            pass
+
+        class User(BaseEntity, table=True):
+            id: int
+            name: str
+
+            @query
+            async def get_users(cls) -> list['User']:
+                return await fetch_users()
+
+        # Create simplified MCP server
+        mcp = config_simple_mcp_server(
+            base=BaseEntity,
+            name="My Blog API",
+            desc="Blog system with users and posts"
+        )
+
+        # Run with stdio transport (default)
+        mcp.run()
+
+        # Or run with HTTP transport
+        mcp.run(transport="streamable-http")
+        ```
+
+    Note:
+        For multi-app scenarios with separate databases, use create_mcp_server()
+        instead, which provides app discovery and routing capabilities.
+
+    Tools provided:
+        - get_schema(): Get the complete GraphQL schema
+        - graphql_query(query): Execute a GraphQL query
+        - graphql_mutation(mutation): Execute a GraphQL mutation
+    """
+    from mcp.server.fastmcp import FastMCP
+
+    from sqlmodel_graphql.mcp.managers.single_app_manager import SingleAppManager
+    from sqlmodel_graphql.mcp.tools.simple_tools import register_simple_tools
+
+    # Create the single-app manager
+    manager = SingleAppManager(base=base, description=desc)
+
+    # Create the FastMCP server
+    mcp = FastMCP(name)
+
+    # Register simplified tools (no app_name required)
+    register_simple_tools(mcp, manager)
+
+    return mcp
