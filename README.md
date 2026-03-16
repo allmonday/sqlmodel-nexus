@@ -207,6 +207,8 @@ type Mutation {
 
 ### 3. Execute Queries with GraphQLHandler
 
+> **Try it live:** Run ` uv run uvicorn demo.app:app --reload` to start a FastAPI server with GraphiQL at http://localhost:8000/graphql
+
 ```python
 from sqlmodel_graphql import GraphQLHandler
 
@@ -407,15 +409,6 @@ async def create(cls, name: str, email: str, query_meta: QueryMeta = None) -> 'U
 ```
 
 **Note:** `query_meta` is only injected when the method has the parameter in its signature AND the return type is an entity. For scalar returns (e.g., `bool`, `str`), it is not passed.
-
-### `SDLGenerator(entities)`
-
-Generate GraphQL SDL from SQLModel classes.
-
-```python
-generator = SDLGenerator([User, Post])
-sdl = generator.generate()
-```
 
 ### `GraphQLHandler(base)`
 Execute GraphQL queries against SQLModel entities with auto-discovery.
