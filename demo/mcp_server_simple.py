@@ -87,6 +87,7 @@ mcp = config_simple_mcp_server(
     base=BaseEntity,
     name="Demo Simple Blog GraphQL MCP Server",
     desc="Blog system with users (simplified 3-tool version)",
+    allow_mutation=True,
 )
 
 # Tool usage examples (for documentation purposes):
