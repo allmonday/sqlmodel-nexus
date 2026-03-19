@@ -34,6 +34,23 @@ uv add sqlmodel-graphql
 uv add sqlmodel-graphql[mcp]  # include mcp server
 ```
 
+## Demo
+
+running GraphQL demo:
+
+```bash
+uv run python -m demo.app 
+# and visit localhost:8000/graphql
+```
+
+running MCP demo
+
+```bash
+uv run --with mcp python -m demo.mcp_server   # stdio mode
+uv run --with mcp python -m demo.mcp_server --http   # http mode
+```
+
+
 ## Quick Start
 
 ### 1. Define Your Models
@@ -367,8 +384,8 @@ pip install sqlmodel-graphql[mcp]
 ### Running MCP Server
 
 ```bash
-uv run python --with mcp demo/mcp_server.py           # stdio mode
-uv run python --with mcp demo/mcp_server.py --http    # HTTP mode
+uv run --with mcp python -m demo.mcp_server   # stdio mode
+uv run --with mcp python -m demo.mcp_server --http   # http mode
 ```
 
 ## API Reference
