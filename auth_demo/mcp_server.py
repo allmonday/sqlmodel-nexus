@@ -1,0 +1,71 @@
+"""MCP server with API Key authentication for AI Agent access.
+
+This demo shows how to protect MCP HTTP endpoints with API Key authentication.
+
+Usage:
+    # HTTP mode (requires API Key in X-API-Key header)
+    uv run python -m auth_demo.mcp_server
+
+Authentication:
+    All MCP requests require X-API-Key header with admin role.
+
+    Example with Claude Desktop config:
+        {
+            "mcpServers": {
+                "auth-demo": {
+                    "url": "http://localhost:8001/mcp",
+                    "headers": {
+                        "X-API-Key": "admin-secret-key"
+                    }
+                }
+            }
+        }
+"""
+
+from auth_demo.auth import MCPAuthMiddleware
+from auth_demo.database import init_db
+from auth_demo.models import BaseEntity
+from sqlmodel_graphql.mcp import create_mcp_server
+
+
+async def lifespan(app):
+    """Initialize database on startup."""
+    await init_db()
+
+
+def main() -> None:
+    """Run MCP server with authentication middleware."""
+    mcp = create_mcp_server(
+        apps=[{"name": "Blog", "base": BaseEntity}],
+        name="Auth Demo Blog GraphQL MCP Server",
+    )
+
+    # Get the underlying Starlette app and add auth middleware
+    # Note: MCP uses streamable-http transport which creates a Starlette app
+    mcp_app = mcp.streamable_http_app()
+    mcp_app.add_middleware(MCPAuthMiddleware)
+
+    # Run with uvicorn
+    import uvicorn
+
+    print("=" * 60)
+    print("MCP Server with API Key Authentication")
+    print("=" * 60)
+    print()
+    print("Authentication required: X-API-Key header")
+    print()
+    print("API Keys:")
+    print("  Admin:    admin-secret-key (full access)")
+    print("  Readonly: readonly-key (no access)")
+    print()
+    print("Example curl:")
+    print('  curl -H "X-API-Key: admin-secret-key" http://localhost:8001/mcp')
+    print()
+    print("Server starting on http://localhost:8001/mcp")
+    print("=" * 60)
+
+    uvicorn.run(mcp_app, host="0.0.0.0", port=8001)
+
+
+if __name__ == "__main__":
+    main()

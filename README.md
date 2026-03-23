@@ -43,7 +43,6 @@ handler = GraphQLHandler(base=SQLModel)
 # 3. Setup FastAPI endpoints
 class GraphQLRequest(BaseModel):
     query: str
-    variables: dict | None = None
 
 app = FastAPI()
 
@@ -53,7 +52,7 @@ async def graphiql():
 
 @app.post("/graphql")
 async def graphql(req: GraphQLRequest):
-    return await handler.execute(req.query, req.variables)
+    return await handler.execute(req.query)
 ```
 
 Run: `uvicorn app:app` and visit `http://localhost:8000/graphql` for the interactive playground.
