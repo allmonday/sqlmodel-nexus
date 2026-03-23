@@ -275,10 +275,14 @@ def register_multi_app_tools(
 
             Examples:
                 # SDL format (recommended)
-                get_mutation_schema(name="createUser", app_name="blog", response_type="sdl")
+                get_mutation_schema(
+                    name="createUser", app_name="blog", response_type="sdl"
+                )
 
                 # Introspection format
-                get_mutation_schema(name="createUser", app_name="blog", response_type="introspection")
+                get_mutation_schema(
+                    name="createUser", app_name="blog", response_type="introspection"
+                )
             """
             try:
                 app = manager.get_app(app_name)

@@ -366,9 +366,17 @@ class IntrospectionGenerator:
                 return {
                     "kind": "NON_NULL",
                     "name": None,
-                    "ofType": {"kind": "INPUT_OBJECT", "name": python_type.__name__, "ofType": None},
+                    "ofType": {
+                        "kind": "INPUT_OBJECT",
+                        "name": python_type.__name__,
+                        "ofType": None,
+                    },
                 }
-            return {"kind": "INPUT_OBJECT", "name": python_type.__name__, "ofType": None}
+            return {
+                "kind": "INPUT_OBJECT",
+                "name": python_type.__name__,
+                "ofType": None,
+            }
 
         # Default to String
         if required:
@@ -433,7 +441,7 @@ class IntrospectionGenerator:
 
         # Also collect enums from query/mutation method signatures
         for methods in [self._query_methods, self._mutation_methods]:
-            for _, (_, method) in methods.items():
+            for _name, (_, method) in methods.items():
                 func = method.__func__ if hasattr(method, "__func__") else method
                 try:
                     hints = get_type_hints(func)
@@ -470,7 +478,7 @@ class IntrospectionGenerator:
 
         # Scan all query and mutation methods
         for methods in [self._query_methods, self._mutation_methods]:
-            for _, (_, method) in methods.items():
+            for _name, (_, method) in methods.items():
                 func = method.__func__ if hasattr(method, "__func__") else method
                 sig = inspect.signature(func)
                 try:
@@ -478,7 +486,7 @@ class IntrospectionGenerator:
                 except Exception:
                     hints = {}
 
-                for param_name, param in sig.parameters.items():
+                for param_name, _param in sig.parameters.items():
                     if param_name in ("cls", "self", "query_meta", "return"):
                         continue
                     if param_name in hints:

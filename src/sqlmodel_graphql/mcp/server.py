@@ -31,15 +31,18 @@ def create_mcp_server(
 
     **Layer 1 (Lightweight):**
     - list_queries: List query names and descriptions for a specific app
-    - list_mutations: List mutation names and descriptions for a specific app (if allow_mutation=True)
+    - list_mutations: List mutation names and descriptions for a specific app
+      (if allow_mutation=True)
 
     **Layer 2 (On-demand):**
     - get_query_schema: Get query details + related type introspection
-    - get_mutation_schema: Get mutation details + related type introspection (if allow_mutation=True)
+    - get_mutation_schema: Get mutation details + related type introspection
+      (if allow_mutation=True)
 
     **Layer 3 (Execution):**
     - graphql_query: Execute GraphQL queries
-    - graphql_mutation: Execute GraphQL mutations (if allow_mutation=True)
+    - graphql_mutation: Execute GraphQL mutations
+      (if allow_mutation=True)
 
     All tools (except list_apps) require a mandatory app_name parameter.
 

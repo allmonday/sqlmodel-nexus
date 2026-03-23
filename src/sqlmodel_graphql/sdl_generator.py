@@ -26,21 +26,30 @@ def _python_type_to_graphql(
     if origin is list:
         args = get_args(python_type)
         if args:
-            inner_type = _python_type_to_graphql_inner(args[0], converter, nullable=True, entity_names=entity_names)
+            inner_type = _python_type_to_graphql_inner(
+                args[0], converter, nullable=True, entity_names=entity_names
+            )
             return f"[{inner_type}!]!"
         return "[String!]!"
 
     # Handle Optional
     if converter.is_optional(python_type):
         inner = converter.unwrap_optional(python_type)
-        return _python_type_to_graphql_inner(inner, converter, nullable=True, entity_names=entity_names)
+        return _python_type_to_graphql_inner(
+            inner, converter, nullable=True, entity_names=entity_names
+        )
 
     # Non-nullable type
-    return _python_type_to_graphql_inner(python_type, converter, nullable=False, entity_names=entity_names)
+    return _python_type_to_graphql_inner(
+        python_type, converter, nullable=False, entity_names=entity_names
+    )
 
 
 def _python_type_to_graphql_inner(
-    python_type: Any, converter: TypeConverter, nullable: bool = True, entity_names: set[str] | None = None
+    python_type: Any,
+    converter: TypeConverter,
+    nullable: bool = True,
+    entity_names: set[str] | None = None,
 ) -> str:
     """Convert Python type to GraphQL type string (inner, without list wrapper)."""
     # Handle enum types
@@ -53,7 +62,12 @@ def _python_type_to_graphql_inner(
         return f"{entity_name}{'!' if not nullable else ''}"
 
     # Check if it's an Input type (SQLModel or BaseModel not in entities)
-    if entity_names is not None and is_input_type(python_type) and python_type.__name__ not in entity_names:
+    is_input = (
+        entity_names is not None
+        and is_input_type(python_type)
+        and python_type.__name__ not in entity_names
+    )
+    if is_input:
         return f"{python_type.__name__}{'!' if not nullable else ''}"
 
     # Handle basic Python types
@@ -188,7 +202,7 @@ class SDLGenerator:
                         except Exception:
                             hints = {}
 
-                        for param_name, param in sig.parameters.items():
+                        for param_name, _param in sig.parameters.items():
                             if param_name in ("cls", "self", "query_meta"):
                                 continue
                             if param_name in hints:
@@ -232,7 +246,12 @@ class SDLGenerator:
             type_def = f'"""{input_type.__doc__}"""\n{type_def}'
         return type_def
 
-    def _input_type_to_graphql(self, python_type: Any, field_info: Any = None, is_optional: bool = False) -> str:
+    def _input_type_to_graphql(
+        self,
+        python_type: Any,
+        field_info: Any = None,
+        is_optional: bool = False,
+    ) -> str:
         """Convert Python type to GraphQL type string for Input types."""
         origin = get_origin(python_type)
 
@@ -399,14 +418,16 @@ class SDLGenerator:
         sig = inspect.signature(func)
         params: list[str] = []
 
-        for param_name, param in sig.parameters.items():
+        for param_name, _param in sig.parameters.items():
             if param_name in ("cls", "self", "query_meta"):
                 continue
 
             if param_name in hints:
-                gql_type = _python_type_to_graphql(hints[param_name], self._converter, self._entity_names)
+                gql_type = _python_type_to_graphql(
+                    hints[param_name], self._converter, self._entity_names
+                )
                 # Parameters are nullable by default if they have defaults
-                if param.default != inspect.Parameter.empty:
+                if _param.default != inspect.Parameter.empty:
                     # Remove the ! for optional parameters
                     gql_type = gql_type.rstrip("!")
                 params.append(f"{param_name}: {gql_type}")
@@ -416,7 +437,9 @@ class SDLGenerator:
         # Get return type
         return_type = hints.get("return", inspect.Signature.empty)
         if return_type != inspect.Signature.empty:
-            return_gql_type = _python_type_to_graphql(return_type, self._converter, self._entity_names)
+            return_gql_type = _python_type_to_graphql(
+                return_type, self._converter, self._entity_names
+            )
         else:
             return_gql_type = "String!"
 
