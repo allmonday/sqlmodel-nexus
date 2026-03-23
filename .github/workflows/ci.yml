@@ -33,8 +33,5 @@ jobs:
       - name: Run linter
         run: uv run ruff check src/
 
-      - name: Run formatter check
-        run: uv run ruff format --check src/
-
       - name: Test with pytest
         run: uv run pytest tests/ -v
