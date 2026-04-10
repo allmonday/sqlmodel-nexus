@@ -183,14 +183,43 @@ class SDLGenerator:
                         except Exception:
                             pass
 
-        # Scan all query and mutation methods
+        # Scan all entities for filter input types and methods
         for entity in self.entities:
+            # Check if entity has filter input type directly attached
+            if hasattr(entity, "_filter_input_type"):
+                filter_input_type = entity._filter_input_type
+                type_name = filter_input_type.__name__
+                if type_name not in visited:
+                    visited.add(type_name)
+                    input_types.add(filter_input_type)
+                    try:
+                        type_hints = get_type_hints(filter_input_type)
+                        for field_type in type_hints.values():
+                            collect_from_type(field_type)
+                    except Exception:
+                        pass
+
+            # Scan query and mutation methods
             for name in dir(entity):
                 try:
                     attr = getattr(entity, name)
                     if not callable(attr):
                         continue
                     func = attr.__func__ if hasattr(attr, "__func__") else attr
+
+                    # Check if method has a pre-defined filter input type
+                    if hasattr(func, "_filter_input_type"):
+                        filter_input_type = func._filter_input_type
+                        type_name = filter_input_type.__name__
+                        if type_name not in visited:
+                            visited.add(type_name)
+                            input_types.add(filter_input_type)
+                            try:
+                                type_hints = get_type_hints(filter_input_type)
+                                for field_type in type_hints.values():
+                                    collect_from_type(field_type)
+                            except Exception:
+                                pass
 
                     # Check for @query or @mutation
                     if hasattr(func, "_graphql_query") or hasattr(func, "_graphql_mutation"):
@@ -422,13 +451,32 @@ class SDLGenerator:
             if param_name in ("cls", "self", "query_meta"):
                 continue
 
-            if param_name in hints:
+            if param_name == "filter":
+                # Check if method or entity has filter input type
+                if hasattr(func, "_filter_input_type"):
+                    filter_input_type = func._filter_input_type
+                elif hasattr(entity, "_filter_input_type"):
+                    filter_input_type = entity._filter_input_type
+                else:
+                    filter_input_type = None
+
+                if filter_input_type:
+                    gql_type = f"{filter_input_type.__name__}"
+                    params.append(f"{param_name}: {gql_type}")
+                elif param_name in hints:
+                    gql_type = _python_type_to_graphql(
+                        hints[param_name], self._converter, self._entity_names
+                    )
+                    if _param.default != inspect.Parameter.empty:
+                        gql_type = gql_type.rstrip("!")
+                    params.append(f"{param_name}: {gql_type}")
+                else:
+                    params.append(f"{param_name}: String!")
+            elif param_name in hints:
                 gql_type = _python_type_to_graphql(
                     hints[param_name], self._converter, self._entity_names
                 )
-                # Parameters are nullable by default if they have defaults
                 if _param.default != inspect.Parameter.empty:
-                    # Remove the ! for optional parameters
                     gql_type = gql_type.rstrip("!")
                 params.append(f"{param_name}: {gql_type}")
             else:

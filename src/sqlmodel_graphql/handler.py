@@ -49,6 +49,7 @@ class GraphQLHandler:
         base: type[SQLModel],
         query_description: str | None = None,
         mutation_description: str | None = None,
+        auto_query_config: Any | None = None,
     ):
         """Initialize the GraphQL handler.
 
@@ -57,10 +58,18 @@ class GraphQLHandler:
                   decorators will be automatically discovered.
             query_description: Optional custom description for Query type.
             mutation_description: Optional custom description for Mutation type.
+            auto_query_config: Optional AutoQueryConfig for auto-generating
+                               standard queries (by_id, by_filter).
         """
         # Discover entities with decorators and their related entities
         discovery = EntityDiscovery(base)
         self.entities = discovery.discover()
+
+        # Add standard queries if auto_query_config is provided
+        if auto_query_config is not None:
+            from sqlmodel_graphql.standard_queries import add_standard_queries
+
+            add_standard_queries(self.entities, auto_query_config)
 
         # Initialize SDL generator
         self._sdl_generator = SDLGenerator(

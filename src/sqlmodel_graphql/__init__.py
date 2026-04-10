@@ -37,6 +37,7 @@ from sqlmodel_graphql.decorator import mutation, query
 from sqlmodel_graphql.handler import GraphQLHandler
 from sqlmodel_graphql.query_parser import QueryParser
 from sqlmodel_graphql.sdl_generator import SDLGenerator
+from sqlmodel_graphql.standard_queries import AutoQueryConfig, add_standard_queries
 from sqlmodel_graphql.types import FieldSelection, QueryMeta, RelationshipSelection
 
 __all__ = [
@@ -53,4 +54,7 @@ __all__ = [
     "QueryMeta",
     "FieldSelection",
     "RelationshipSelection",
+    # Standard queries
+    "AutoQueryConfig",
+    "add_standard_queries",
 ]

@@ -1591,7 +1591,7 @@ wheels = [
 
 [[package]]
 name = "sqlmodel-graphql"
-version = "0.11.0"
+version = "0.12.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
@@ -1616,7 +1616,7 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "ruff" },
 ]
-mcp = [
+fastmcp = [
     { name = "fastmcp" },
 ]
 
@@ -1635,7 +1635,7 @@ requires-dist = [
     { name = "aiosqlite", marker = "extra == 'dev'", specifier = ">=0.19.0" },
     { name = "fastapi", specifier = ">=0.135.1" },
     { name = "fastapi", marker = "extra == 'demo'", specifier = ">=0.100.0" },
-    { name = "fastmcp", marker = "extra == 'mcp'", specifier = ">=3.1,<3.2" },
+    { name = "fastmcp", marker = "extra == 'fastmcp'", specifier = ">=3.1,<3.2" },
     { name = "graphql-core", specifier = ">=3.2.0" },
     { name = "greenlet", specifier = ">=3.3.2" },
     { name = "greenlet", marker = "extra == 'demo'", specifier = ">=3.3.2" },
@@ -1648,7 +1648,7 @@ requires-dist = [
     { name = "uvicorn", specifier = ">=0.41.0" },
     { name = "uvicorn", marker = "extra == 'demo'", specifier = ">=0.23.0" },
 ]
-provides-extras = ["dev", "demo", "mcp"]
+provides-extras = ["dev", "demo", "fastmcp"]
 
 [package.metadata.requires-dev]
 dev = [
