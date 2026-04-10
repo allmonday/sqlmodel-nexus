@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.13.0
+
+- Add `AutoQueryConfig` for auto-generating `by_id` and `by_filter` queries for SQLModel entities
+- `by_id`: find a single entity by primary key
+- `by_filter`: filter entities by field values with auto-generated `FilterInput` type
+- Pass `auto_query_config` to `GraphQLHandler` to enable; handler discovers all entity subclasses automatically
+- Update README.md with Auto-Generated Standard Queries documentation
+
 ## 0.12.0
 - migrate from mcp to fastmcp
 

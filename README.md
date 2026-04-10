@@ -318,6 +318,74 @@ result = await handler.execute("""
 # }
 ```
 
+## Auto-Generated Standard Queries
+
+Pass `AutoQueryConfig` to `GraphQLHandler` to automatically generate `by_id` and `by_filter` queries for every entity — no `@query` decorator needed.
+
+### Configuration
+
+```python
+from sqlmodel_graphql import GraphQLHandler, AutoQueryConfig
+
+config = AutoQueryConfig(
+    session_factory=async_session,   # Required: async session factory
+    default_limit=10,                # Default limit for by_filter
+    generate_by_id=True,             # Generate by_id query
+    generate_by_filter=True,         # Generate by_filter query
+)
+
+handler = GraphQLHandler(base=BaseEntity, auto_query_config=config)
+```
+
+When `auto_query_config` is provided, the handler discovers **all** entity subclasses (not only those with decorators) and attaches standard queries.
+
+### Generated Queries
+
+For an entity named `User` with primary key `id`:
+
+| Method | GraphQL Field | Return Type | Description |
+|--------|--------------|-------------|-------------|
+| `by_id` | `userById(id: Int!): User` | `User \| None` | Find a single entity by primary key |
+| `by_filter` | `userByFilter(filter: UserFilterInput, limit: Int): [User!]!` | `list[User]` | Filter entities by field values |
+
+**FilterInput** is auto-generated per entity. All fields are optional — only non-`None` values are used as `WHERE` conditions (exact match).
+
+### Example
+
+```graphql
+# Get by ID
+{
+  userById(id: 1) {
+    id
+    name
+    email
+    posts { title }
+  }
+}
+
+# Filter by fields
+{
+  userByFilter(filter: { name: "Alice" }, limit: 5) {
+    id
+    name
+    email
+  }
+}
+
+# List all (no filter)
+{
+  userByFilter(limit: 20) {
+    id
+    name
+  }
+}
+```
+
+**Notes:**
+- `by_id` requires exactly one primary key field (detected from `id` field or `primary_key=True`).
+- `by_filter` supports exact match only; for complex queries, write custom `@query` methods.
+- Existing methods on the entity are not overridden.
+
 ## MCP Integration
 
 Turn your SQLModel entities into AI-ready tools with a single function call.
