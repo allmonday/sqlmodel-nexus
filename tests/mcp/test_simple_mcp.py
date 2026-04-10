@@ -49,7 +49,9 @@ class SimpleMCPMockUser(SimpleMCPMockBaseEntity, table=True):
     email: str
 
     @query
-    async def get_users(cls, limit: int = 10, query_meta: QueryMeta | None = None) -> list[SimpleMCPMockUser]:
+    async def get_users(
+        cls, limit: int = 10, query_meta: QueryMeta | None = None
+    ) -> list[SimpleMCPMockUser]:
         """Get all mock users."""
         # Return mock data
         # Note: limit might be passed as string due to GraphQL argument conversion
@@ -62,12 +64,16 @@ class SimpleMCPMockUser(SimpleMCPMockBaseEntity, table=True):
         return users[:limit_int]
 
     @query
-    async def get_user(cls, id: int, query_meta: QueryMeta | None = None) -> SimpleMCPMockUser | None:
+    async def get_user(
+        cls, id: int, query_meta: QueryMeta | None = None
+    ) -> SimpleMCPMockUser | None:
         """Get a mock user by ID."""
         return SimpleMCPMockUser(id=id, name="Test User", email="test@example.com")
 
     @mutation
-    async def create_user(cls, name: str, email: str, query_meta: QueryMeta | None = None) -> SimpleMCPMockUser:
+    async def create_user(
+        cls, name: str, email: str, query_meta: QueryMeta | None = None
+    ) -> SimpleMCPMockUser:
         """Create a new mock user."""
         return SimpleMCPMockUser(id=99, name=name, email=email)
 
@@ -224,7 +230,10 @@ class TestGraphQLMutation:
         graphql_mutation_tool = tools.get("graphql_mutation")
 
         result = await graphql_mutation_tool.fn(
-            mutation='mutation { simpleMCPMockUserCreateUser(name: "Test", email: "test@example.com") { id name } }'
+            mutation=(
+                'mutation { simpleMCPMockUserCreateUser('
+                'name: "Test", email: "test@example.com") { id name } }'
+            )
         )
 
         assert result["success"] is True
@@ -377,7 +386,10 @@ class TestSimpleMCPIntegration:
         # Step 3: Execute mutation
         graphql_mutation_tool = tools.get("graphql_mutation")
         mutation_result = await graphql_mutation_tool.fn(
-            mutation='mutation { simpleMCPMockUserCreateUser(name: "New User", email: "new@example.com") { id name } }'
+            mutation=(
+                'mutation { simpleMCPMockUserCreateUser('
+                'name: "New User", email: "new@example.com") { id name } }'
+            )
         )
 
         assert mutation_result["success"] is True

@@ -13,9 +13,9 @@ from sqlmodel import Field, select
 # Add parent directory to path to import from demo
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from demo.database import async_session
 from sqlmodel import SQLModel
 
+from demo.database import async_session
 from sqlmodel_graphql import mutation, query
 from sqlmodel_graphql.mcp import config_simple_mcp_server
 
@@ -101,7 +101,9 @@ result = graphql_query(query="{ users(limit: 5) { id name email } }")
 # Returns: {"success": true, "data": {"users": [...]}}
 
 # 3. Execute Mutation
-result = graphql_mutation(mutation='mutation { createUser(name: "Dave", email: "dave@example.com") { id name } }')
+result = graphql_mutation(
+    mutation='mutation { createUser(name: "Dave", email: "dave@example.com") { id name } }'
+)
 # Returns: {"success": true, "data": {"createUser": {...}}}
 """
 

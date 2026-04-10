@@ -11,9 +11,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from pydantic import BaseModel
 
-from demo.database import init_db
+from demo.database import async_session, init_db
 from demo.models import BaseEntity
-from sqlmodel_graphql import GraphQLHandler
+from sqlmodel_graphql import AutoQueryConfig, GraphQLHandler
 
 
 class GraphQLRequest(BaseModel):
@@ -24,8 +24,12 @@ class GraphQLRequest(BaseModel):
     operation_name: str | None = None
 
 
-# Create GraphQL handler
-handler = GraphQLHandler(base=BaseEntity)
+# Create GraphQL handler with auto query configuration
+config = AutoQueryConfig(
+    session_factory=async_session,
+    default_limit=20,
+)
+handler = GraphQLHandler(base=BaseEntity, auto_query_config=config)
 
 
 @asynccontextmanager

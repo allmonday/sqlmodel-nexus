@@ -86,7 +86,9 @@ class User(BaseEntity, table=True):
             return result.first()
 
     @mutation
-    async def create_user(cls, name: str, email: str, query_meta: QueryMeta | None = None) -> "User":
+    async def create_user(
+        cls, name: str, email: str, query_meta: QueryMeta | None = None
+    ) -> "User":
         """Create a new user (idempotent)."""
         from demo.database import async_session
 
@@ -328,7 +330,9 @@ class Comment(BaseEntity, table=True):
     author: Optional["User"] = Relationship(back_populates="comments")
 
     @query
-    async def get_comments(cls, limit: int = 10, query_meta: QueryMeta | None = None) -> list["Comment"]:
+    async def get_comments(
+        cls, limit: int = 10, query_meta: QueryMeta | None = None
+    ) -> list["Comment"]:
         """Get all comments with optional limit."""
         from demo.database import async_session
 

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from sqlmodel_graphql import GraphQLHandler, AutoQueryConfig, add_standard_queries
+from demo.database import async_session
 
 # Import demo models
-from demo.models import BaseEntity, User, Post, Comment
-from demo.database import async_session
+from demo.models import BaseEntity, Comment, Post, User
+from sqlmodel_graphql import AutoQueryConfig, GraphQLHandler, add_standard_queries
 
 
 def test_demo_with_standard_queries():

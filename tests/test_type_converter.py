@@ -1,7 +1,6 @@
 """Tests for TypeConverter."""
 
 from enum import Enum
-from typing import Optional, Union
 
 from sqlmodel import SQLModel
 
@@ -35,13 +34,13 @@ class TestTypeConverterIsOptional:
     def test_is_optional_with_optional_type(self) -> None:
         """Test that Optional[T] is detected as optional."""
         converter = TypeConverter({"UserForConverterTest"})
-        assert converter.is_optional(Optional[int]) is True
-        assert converter.is_optional(Optional[str]) is True
+        assert converter.is_optional(int | None) is True
+        assert converter.is_optional(str | None) is True
 
     def test_is_optional_with_union_syntax(self) -> None:
         """Test that Union[T, None] is detected as optional."""
         converter = TypeConverter({"UserForConverterTest"})
-        assert converter.is_optional(Union[int, None]) is True
+        assert converter.is_optional(int | None) is True
 
     def test_is_optional_with_pipe_syntax(self) -> None:
         """Test that T | None is detected as optional (Python 3.10+)."""
@@ -68,26 +67,26 @@ class TestTypeConverterUnwrapOptional:
     def test_unwrap_optional_int(self) -> None:
         """Test unwrapping Optional[int]."""
         converter = TypeConverter({"UserForConverterTest"})
-        result = converter.unwrap_optional(Optional[int])
-        assert result == int
+        result = converter.unwrap_optional(int | None)
+        assert result is int
 
     def test_unwrap_optional_str(self) -> None:
         """Test unwrapping Optional[str]."""
         converter = TypeConverter({"UserForConverterTest"})
         result = converter.unwrap_optional(str | None)
-        assert result == str
+        assert result is str
 
     def test_unwrap_optional_with_union(self) -> None:
         """Test unwrapping Union[T, None]."""
         converter = TypeConverter({"UserForConverterTest"})
-        result = converter.unwrap_optional(Union[int, None])
-        assert result == int
+        result = converter.unwrap_optional(int | None)
+        assert result is int
 
     def test_unwrap_non_optional_type(self) -> None:
         """Test unwrapping non-optional type returns the type itself."""
         converter = TypeConverter({"UserForConverterTest"})
         result = converter.unwrap_optional(int)
-        assert result == int
+        assert result is int
 
 
 class TestTypeConverterIsListType:
@@ -105,7 +104,7 @@ class TestTypeConverterIsListType:
         converter = TypeConverter({"UserForConverterTest"})
         assert converter.is_list_type(int) is False
         assert converter.is_list_type(str) is False
-        assert converter.is_list_type(Optional[int]) is False
+        assert converter.is_list_type(int | None) is False
 
 
 class TestTypeConverterGetListInnerType:
@@ -115,7 +114,7 @@ class TestTypeConverterGetListInnerType:
         """Test getting inner type from list[int]."""
         converter = TypeConverter({"UserForConverterTest"})
         result = converter.get_list_inner_type(list[int])
-        assert result == int
+        assert result is int
 
     def test_get_list_inner_type_entity(self) -> None:
         """Test getting inner type from list[Entity]."""
@@ -127,13 +126,13 @@ class TestTypeConverterGetListInnerType:
         """Test getting inner type from list[Optional[int]]."""
         converter = TypeConverter({"UserForConverterTest"})
         result = converter.get_list_inner_type(list[int | None])
-        assert result == int
+        assert result is int
 
     def test_get_list_inner_type_empty(self) -> None:
         """Test getting inner type from untyped list."""
         converter = TypeConverter({"UserForConverterTest"})
         result = converter.get_list_inner_type(list)
-        assert result == list
+        assert result is list
 
 
 class TestTypeConverterScalarTypeName:
@@ -240,7 +239,7 @@ class TestTypeConverterIsRelationship:
     def test_is_relationship_optional_entity(self) -> None:
         """Test detecting optional entity relationship."""
         converter = TypeConverter({"UserForConverterTest"})
-        assert converter.is_relationship(Optional[UserForConverterTest]) is True
+        assert converter.is_relationship(UserForConverterTest | None) is True
 
     def test_is_relationship_list_entity(self) -> None:
         """Test detecting list of entities relationship."""
@@ -257,7 +256,7 @@ class TestTypeConverterIsRelationship:
         converter = TypeConverter({"UserForConverterTest"})
         assert converter.is_relationship(int) is False
         assert converter.is_relationship(list[int]) is False
-        assert converter.is_relationship(Optional[str]) is False
+        assert converter.is_relationship(str | None) is False
 
 
 class TestTypeConverterUnwrapToBaseType:
@@ -266,20 +265,20 @@ class TestTypeConverterUnwrapToBaseType:
     def test_unwrap_to_base_type_optional(self) -> None:
         """Test unwrapping Optional[T] to T."""
         converter = TypeConverter({"UserForConverterTest"})
-        result = converter.unwrap_to_base_type(Optional[int])
-        assert result == int
+        result = converter.unwrap_to_base_type(int | None)
+        assert result is int
 
     def test_unwrap_to_base_type_list(self) -> None:
         """Test unwrapping list[T] to T."""
         converter = TypeConverter({"UserForConverterTest"})
         result = converter.unwrap_to_base_type(list[int])
-        assert result == int
+        assert result is int
 
     def test_unwrap_to_base_type_list_optional(self) -> None:
         """Test unwrapping list[Optional[T]] to T."""
         converter = TypeConverter({"UserForConverterTest"})
         result = converter.unwrap_to_base_type(list[int | None])
-        assert result == int
+        assert result is int
 
     def test_unwrap_to_base_type_entity(self) -> None:
         """Test unwrapping entity type returns itself."""
@@ -290,5 +289,5 @@ class TestTypeConverterUnwrapToBaseType:
     def test_unwrap_to_base_type_scalar(self) -> None:
         """Test unwrapping scalar type returns itself."""
         converter = TypeConverter({"UserForConverterTest"})
-        assert converter.unwrap_to_base_type(int) == int
-        assert converter.unwrap_to_base_type(str) == str
+        assert converter.unwrap_to_base_type(int) is int
+        assert converter.unwrap_to_base_type(str) is str

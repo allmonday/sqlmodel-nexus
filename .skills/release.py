@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Release version skill implementation."""
 
-import sys
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -81,7 +81,7 @@ def run_tests():
 def create_commit(version):
     """Create a commit for version bump."""
     run_command("git add pyproject.toml uv.lock")
-    run_command(f'git commit -m "bump ver"')
+    run_command('git commit -m "bump ver"')
     result = run_command("git rev-parse --short HEAD")
     commit_hash = result.stdout.strip()
     print(f"✅ Created commit: {commit_hash}")
@@ -107,7 +107,7 @@ def push_tag(tag_name):
     print(f"\n🚀 Pushing tag {tag_name} to origin...")
     result = run_command(f"git push origin {tag_name}", check=False)
     if result.returncode != 0:
-        print(f"❌ Failed to push tag")
+        print("❌ Failed to push tag")
         print(f"   {result.stderr}")
         print("\n💡 Tips:")
         print("   - Check your network connection")

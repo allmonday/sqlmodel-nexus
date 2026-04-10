@@ -30,7 +30,7 @@ class TestGetFieldType:
     def test_get_field_type_from_model_fields(self) -> None:
         """Test getting field type from model_fields."""
         result = get_field_type(EntityForUtilsTest, "name")
-        assert result == str
+        assert result is str
 
     def test_get_field_type_optional(self) -> None:
         """Test getting optional field type."""

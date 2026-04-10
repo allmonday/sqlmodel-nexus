@@ -13,7 +13,6 @@ from sqlmodel import Field, Relationship, SQLModel, select
 
 from sqlmodel_graphql import QueryMeta, mutation, query
 
-
 # =============================================================================
 # Blog Application Models
 # =============================================================================
@@ -60,7 +59,9 @@ class User(BlogBaseEntity, table=True):
             return result.first()
 
     @mutation
-    async def create_user(cls, name: str, email: str, query_meta: QueryMeta | None = None) -> "User":
+    async def create_user(
+        cls, name: str, email: str, query_meta: QueryMeta | None = None
+    ) -> "User":
         """Create a new user."""
         from .database import get_blog_session
 
@@ -162,7 +163,9 @@ class Product(ShopBaseEntity, table=True):
     order_items: list["OrderItem"] = Relationship(back_populates="product")
 
     @query
-    async def get_products(cls, limit: int = 10, query_meta: QueryMeta | None = None) -> list["Product"]:
+    async def get_products(
+        cls, limit: int = 10, query_meta: QueryMeta | None = None
+    ) -> list["Product"]:
         """Get all products with optional limit."""
         from .database import get_shop_session
 
@@ -217,7 +220,9 @@ class Order(ShopBaseEntity, table=True):
     items: list["OrderItem"] = Relationship(back_populates="order")
 
     @query
-    async def get_orders(cls, limit: int = 10, query_meta: QueryMeta | None = None) -> list["Order"]:
+    async def get_orders(
+        cls, limit: int = 10, query_meta: QueryMeta | None = None
+    ) -> list["Order"]:
         """Get all orders with optional limit."""
         from .database import get_shop_session
 

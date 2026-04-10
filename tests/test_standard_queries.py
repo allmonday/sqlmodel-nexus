@@ -2,9 +2,50 @@
 
 from __future__ import annotations
 
+import pytest
+from pydantic import BaseModel
 from sqlmodel import Field, SQLModel
 
-from sqlmodel_graphql import AutoQueryConfig, GraphQLHandler, add_standard_queries
+from sqlmodel_graphql import AutoQueryConfig, GraphQLHandler, add_standard_queries, query
+
+
+class ExplicitSearchFilter(BaseModel):
+    keyword: str | None = None
+
+
+class _Result:
+    def __init__(self, first_value=None, all_values=None):
+        self._first_value = first_value
+        self._all_values = all_values or []
+
+    def first(self):
+        return self._first_value
+
+    def all(self):
+        return self._all_values
+
+
+class _RecordingSession:
+    def __init__(self, state: dict[str, object], result: _Result | None = None):
+        self._state = state
+        self._result = result or _Result()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def exec(self, stmt):
+        self._state["stmt"] = stmt
+        return self._result
+
+
+def _session_factory(state: dict[str, object], result: _Result | None = None):
+    async def factory():
+        return _RecordingSession(state, result)
+
+    return factory
 
 
 def test_standard_queries_functionality():
@@ -18,22 +59,13 @@ def test_standard_queries_functionality():
         email: str
         age: int | None = None
 
-    # Mock session factory
-    async def async_session_factory():
-        mock_session = type("", (), {})()
-        mock_session.exec = lambda _: type("", (), {"first": lambda: None})()
-        mock_session.__aenter__ = lambda self: self
-        mock_session.__aexit__ = lambda *args: None
-        return mock_session
-
     # Add standard queries
-    config = AutoQueryConfig(session_factory=async_session_factory)
+    config = AutoQueryConfig(session_factory=_session_factory({}))
     add_standard_queries([TestUser], config)
 
     # Verify methods exist
     assert hasattr(TestUser, "by_id")
     assert hasattr(TestUser, "by_filter")
-    assert hasattr(TestUser, "_filter_input_type")
 
     # Generate SDL
     handler = GraphQLHandler(base=TestBase)
@@ -58,17 +90,9 @@ def test_disable_standard_queries():
         name: str
         email: str
 
-    # Mock session factory
-    async def async_session_factory():
-        mock_session = type("", (), {})()
-        mock_session.exec = lambda _: type("", (), {"first": lambda: None})()
-        mock_session.__aenter__ = lambda self: self
-        mock_session.__aexit__ = lambda *args: None
-        return mock_session
-
     # Add standard queries with disabled
     config = AutoQueryConfig(
-        session_factory=async_session_factory,
+        session_factory=_session_factory({}),
         enabled=False,
     )
     add_standard_queries([TestUser2], config)
@@ -88,17 +112,9 @@ def test_only_generate_by_filter():
         name: str
         email: str
 
-    # Mock session factory
-    async def async_session_factory():
-        mock_session = type("", (), {})()
-        mock_session.exec = lambda _: type("", (), {"first": lambda: None})()
-        mock_session.__aenter__ = lambda self: self
-        mock_session.__aexit__ = lambda *args: None
-        return mock_session
-
     # Add standard queries with only by_filter
     config = AutoQueryConfig(
-        session_factory=async_session_factory,
+        session_factory=_session_factory({}),
         generate_by_id=False,
     )
     add_standard_queries([TestUser3], config)
@@ -126,18 +142,138 @@ def test_dont_override_existing_methods():
         def by_filter():
             return "existing filter"
 
-    # Mock session factory
-    async def async_session_factory():
-        mock_session = type("", (), {})()
-        mock_session.exec = lambda _: type("", (), {"first": lambda: None})()
-        mock_session.__aenter__ = lambda self: self
-        mock_session.__aexit__ = lambda *args: None
-        return mock_session
-
     # Add standard queries
-    config = AutoQueryConfig(session_factory=async_session_factory)
+    config = AutoQueryConfig(session_factory=_session_factory({}))
     add_standard_queries([TestUser4], config)
 
     # Verify existing methods are preserved
     assert TestUser4.by_id() == "existing method"
     assert TestUser4.by_filter() == "existing filter"
+
+
+def test_auto_query_config_discovers_entities_without_existing_methods():
+    """Test auto query config includes undecorated entities."""
+
+    class TestBase5(SQLModel):
+        pass
+
+    class TestUser5(TestBase5, table=False):
+        id: int | None = Field(default=None, primary_key=True)
+        name: str
+
+    handler = GraphQLHandler(
+        base=TestBase5,
+        auto_query_config=AutoQueryConfig(session_factory=_session_factory({})),
+    )
+    sdl = handler.get_sdl()
+
+    assert "testUser5ById" in sdl
+    assert "testUser5ByFilter" in sdl
+
+
+@pytest.mark.asyncio
+async def test_by_filter_execution_uses_input_model_values():
+    """Test by_filter converts GraphQL input objects into usable filter values."""
+
+    class TestBase6(SQLModel):
+        pass
+
+    class TestUser6(TestBase6, table=True):
+        id: int | None = Field(default=None, primary_key=True)
+        name: str
+        age: int | None = None
+
+    state: dict[str, object] = {}
+    handler = GraphQLHandler(
+        base=TestBase6,
+        auto_query_config=AutoQueryConfig(session_factory=_session_factory(state)),
+    )
+
+    result = await handler.execute(
+        '{ testUser6ByFilter(filter: {name: "alice", age: 30}) { id name } }'
+    )
+
+    assert "errors" not in result
+    stmt = state["stmt"]
+    where_clause = str(stmt.whereclause)
+    assert "name" in where_clause
+    assert "age" in where_clause
+
+
+def test_filter_input_includes_inherited_fields():
+    """Test filter input includes fields inherited from the base entity."""
+
+    class TenantBase(SQLModel):
+        id: int | None = Field(default=None, primary_key=True)
+        tenant_id: int
+
+    class TenantUser(TenantBase, table=False):
+        name: str
+
+    add_standard_queries(
+        [TenantUser],
+        AutoQueryConfig(session_factory=_session_factory({})),
+    )
+
+    handler = GraphQLHandler(base=TenantBase)
+    sdl = handler.get_sdl()
+
+    assert "input TenantUserFilterInput" in sdl
+    assert "tenant_id: Int" in sdl
+
+
+@pytest.mark.asyncio
+async def test_by_id_uses_actual_primary_key_name_and_type():
+    """Test by_id uses the entity primary key field instead of hard-coded id."""
+
+    class TestBase7(SQLModel):
+        pass
+
+    class Product(TestBase7, table=True):
+        code: str = Field(primary_key=True)
+        name: str
+
+    state: dict[str, object] = {}
+    handler = GraphQLHandler(
+        base=TestBase7,
+        auto_query_config=AutoQueryConfig(session_factory=_session_factory(state)),
+    )
+    sdl = handler.get_sdl()
+
+    assert "productById(code: String!)" in sdl
+
+    result = await handler.execute('{ productById(code: "sku-1") { code name } }')
+
+    assert "errors" not in result
+    where_clause = str(state["stmt"].whereclause)
+    assert "code" in where_clause
+
+
+def test_existing_custom_filter_input_is_not_overridden_in_sdl():
+    """Test auto queries do not replace explicit filter input types on custom queries."""
+
+    class TestBase8(SQLModel):
+        pass
+
+    class TestUser8(TestBase8, table=False):
+        id: int | None = Field(default=None, primary_key=True)
+        name: str
+
+        @query
+        async def search(cls, filter: ExplicitSearchFilter) -> list[TestUser8]:
+            return []
+
+    add_standard_queries(
+        [TestUser8],
+        AutoQueryConfig(
+            session_factory=_session_factory({}),
+            generate_by_filter=False,
+        ),
+    )
+
+    handler = GraphQLHandler(base=TestBase8)
+    sdl = handler.get_sdl()
+
+    assert "input ExplicitSearchFilter" in sdl
+    assert "testUser8Search(filter: ExplicitSearchFilter!): [TestUser8!]!" in sdl
+    assert "input TestUser8FilterInput" not in sdl

@@ -31,16 +31,37 @@ class EntityDiscovery:
             base: The base class to scan for subclasses.
         """
         self._base = base
-        self._all_subclasses = set(base.__subclasses__())
+        self._all_subclasses = self._collect_all_subclasses(base)
 
-    def discover(self) -> list[type]:
+    def discover(self, include_all: bool = False) -> list[type]:
         """Discover all entities with decorators and their related entities.
+
+        Args:
+            include_all: If True, return all subclasses of the base entity.
 
         Returns:
             List of discovered entity classes.
         """
+        if include_all:
+            return list(self._all_subclasses)
+
         root_entities = self._find_root_entities()
         return self._traverse_relationships(root_entities)
+
+    def _collect_all_subclasses(self, base: type) -> set[type]:
+        """Collect all subclasses recursively."""
+        discovered: set[type] = set()
+        queue = deque(base.__subclasses__())
+
+        while queue:
+            subclass = queue.popleft()
+            if subclass in discovered:
+                continue
+
+            discovered.add(subclass)
+            queue.extend(subclass.__subclasses__())
+
+        return discovered
 
     def _find_root_entities(self) -> set[type]:
         """Find entities with @query/@mutation decorators.

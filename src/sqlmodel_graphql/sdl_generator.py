@@ -183,23 +183,8 @@ class SDLGenerator:
                         except Exception:
                             pass
 
-        # Scan all entities for filter input types and methods
+        # Scan all query and mutation methods
         for entity in self.entities:
-            # Check if entity has filter input type directly attached
-            if hasattr(entity, "_filter_input_type"):
-                filter_input_type = entity._filter_input_type
-                type_name = filter_input_type.__name__
-                if type_name not in visited:
-                    visited.add(type_name)
-                    input_types.add(filter_input_type)
-                    try:
-                        type_hints = get_type_hints(filter_input_type)
-                        for field_type in type_hints.values():
-                            collect_from_type(field_type)
-                    except Exception:
-                        pass
-
-            # Scan query and mutation methods
             for name in dir(entity):
                 try:
                     attr = getattr(entity, name)
@@ -452,11 +437,9 @@ class SDLGenerator:
                 continue
 
             if param_name == "filter":
-                # Check if method or entity has filter input type
+                # Check if method has a pre-defined filter input type
                 if hasattr(func, "_filter_input_type"):
                     filter_input_type = func._filter_input_type
-                elif hasattr(entity, "_filter_input_type"):
-                    filter_input_type = entity._filter_input_type
                 else:
                     filter_input_type = None
 

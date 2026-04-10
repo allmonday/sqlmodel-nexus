@@ -1,7 +1,7 @@
 """Tests for SDL generator."""
 
 from enum import Enum
-from typing import Optional, Union
+from typing import Optional
 
 from pydantic import BaseModel
 from sqlmodel import Field, SQLModel
@@ -42,7 +42,9 @@ class UserForTest(SQLModel):
         return users.get(id)
 
     @mutation
-    async def create(cls, name: str, email: str, query_meta: QueryMeta | None = None) -> "UserForTest":
+    async def create(
+        cls, name: str, email: str, query_meta: QueryMeta | None = None
+    ) -> "UserForTest":
         """Create a new user."""
         return UserForTest(id=3, name=name, email=email)
 
@@ -151,12 +153,12 @@ class TestGetCoreTypes:
 
     def test_get_core_types_optional(self) -> None:
         """Test extracting core types from Optional[T]."""
-        result = get_core_types(Optional[int])
+        result = get_core_types(int | None)
         assert result == [int]
 
     def test_get_core_types_union(self) -> None:
         """Test extracting core types from Union[T, U]."""
-        result = get_core_types(Union[int, str])
+        result = get_core_types(int | str)
         assert set(result) == {int, str}
 
     def test_get_core_types_list(self) -> None:
@@ -176,7 +178,7 @@ class TestGetCoreTypes:
 
     def test_get_core_types_none_in_union(self) -> None:
         """Test that None is excluded from Union."""
-        result = get_core_types(Union[int, None])
+        result = get_core_types(int | None)
         assert result == [int]
         assert type(None) not in result
 
@@ -252,7 +254,7 @@ class TestPythonTypeToGraphql:
 
     def test_optional_int(self) -> None:
         """Test converting Optional[int] type."""
-        result = _python_type_to_graphql(Optional[int], self.converter)
+        result = _python_type_to_graphql(int | None, self.converter)
         assert result == "Int"
 
     def test_optional_str(self) -> None:
@@ -287,7 +289,7 @@ class TestPythonTypeToGraphql:
 
     def test_optional_entity(self) -> None:
         """Test converting Optional[Entity] type."""
-        result = _python_type_to_graphql(Optional[EntityForHelperTest], self.converter)
+        result = _python_type_to_graphql(EntityForHelperTest | None, self.converter)
         assert result == "EntityForHelperTest"
 
     def test_list_entity(self) -> None:

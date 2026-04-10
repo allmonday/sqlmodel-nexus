@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from pydantic import BaseModel
-from sqlmodel import SQLModel, Field, select
+from sqlmodel import Field, SQLModel
+
 from sqlmodel_graphql import GraphQLHandler, query
 
 
@@ -41,7 +42,9 @@ class TestUserWithQueries(TestBase, table=False):
         return TestUserWithQueries(id=id, name=f"User {id}", email=f"user{id}@test.com")
 
     @query
-    async def by_filter(cls, filter: TestUserFilterInput, limit: int = 10, query_meta=None) -> list[TestUserWithQueries]:
+    async def by_filter(
+        cls, filter: TestUserFilterInput, limit: int = 10, query_meta=None
+    ) -> list[TestUserWithQueries]:
         """Get users by filter."""
         users = []
         for i in range(1, limit + 1):

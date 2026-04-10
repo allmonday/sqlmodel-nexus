@@ -63,7 +63,7 @@ class GraphQLHandler:
         """
         # Discover entities with decorators and their related entities
         discovery = EntityDiscovery(base)
-        self.entities = discovery.discover()
+        self.entities = discovery.discover(include_all=auto_query_config is not None)
 
         # Add standard queries if auto_query_config is provided
         if auto_query_config is not None:

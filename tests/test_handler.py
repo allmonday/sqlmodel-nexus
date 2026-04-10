@@ -249,7 +249,9 @@ class TestListStrArgument:
     @pytest.mark.asyncio
     async def test_list_str_argument_literal(self, handler: GraphQLHandler) -> None:
         """Test executing a query with list[str] argument as literal."""
-        result = await handler.execute('{ handlerTestListArgGetByTags(tags: ["tag1", "tag2"]) { id tags } }')
+        result = await handler.execute(
+            '{ handlerTestListArgGetByTags(tags: ["tag1", "tag2"]) { id tags } }'
+        )
 
         assert "data" in result
         assert "handlerTestListArgGetByTags" in result["data"]
@@ -337,23 +339,29 @@ class TestListArgumentInMutation:
 
         assert "data" in result
         assert result["data"]["handlerTestListMutationCreateWithItems"]["title"] == "任务"
-        assert result["data"]["handlerTestListMutationCreateWithItems"]["items"] == ["洗脸", "刷牙", "洗脚"]
+        assert result["data"]["handlerTestListMutationCreateWithItems"]["items"] == [
+            "洗脸", "刷牙", "洗脚"
+        ]
 
     @pytest.mark.asyncio
     async def test_mutation_with_list_int(self, handler: GraphQLHandler) -> None:
         """Test mutation with list[int] argument."""
         result = await handler.execute(
-            "mutation { handlerTestListMutationCreateWithNumbers(numbers: [1, 2, 3, 4, 5]) { id numbers } }"
+            "mutation { handlerTestListMutationCreateWithNumbers("
+            "numbers: [1, 2, 3, 4, 5]) { id numbers } }"
         )
 
         assert "data" in result
-        assert result["data"]["handlerTestListMutationCreateWithNumbers"]["numbers"] == [1, 2, 3, 4, 5]
+        assert result["data"]["handlerTestListMutationCreateWithNumbers"]["numbers"] == [
+            1, 2, 3, 4, 5
+        ]
 
     @pytest.mark.asyncio
     async def test_mutation_with_empty_list(self, handler: GraphQLHandler) -> None:
         """Test mutation with empty list argument."""
         result = await handler.execute(
-            'mutation { handlerTestListMutationCreateWithItems(title: "Empty", items: []) { id title items } }'
+            'mutation { handlerTestListMutationCreateWithItems('
+            'title: "Empty", items: []) { id title items } }'
         )
 
         assert "data" in result
@@ -381,7 +389,8 @@ class TestListArgumentInMutation:
     ) -> None:
         """Test mutation with single item in list."""
         result = await handler.execute(
-            'mutation { handlerTestListMutationCreateWithItems(title: "Single", items: ["only"]) { id items } }'
+            'mutation { handlerTestListMutationCreateWithItems('
+            'title: "Single", items: ["only"]) { id items } }'
         )
 
         assert "data" in result
