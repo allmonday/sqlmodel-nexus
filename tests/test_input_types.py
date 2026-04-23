@@ -49,7 +49,7 @@ class InputTestUser(InputTestBase, table=False):
     age: int | None = None
 
     @mutation
-    async def create(cls, input: UserCreateInput, query_meta=None) -> InputTestUser:
+    async def create(cls, input: UserCreateInput) -> InputTestUser:
         """Create a new user."""
         return InputTestUser(
             id=1, name=input.name, email=input.email, age=input.age
@@ -57,7 +57,7 @@ class InputTestUser(InputTestBase, table=False):
 
     @mutation
     async def create_with_address(
-        cls, input: UserWithAddressInput, query_meta=None
+        cls, input: UserWithAddressInput
     ) -> InputTestUser:
         """Create user with address."""
         return InputTestUser(id=1, name=input.name, email="test@test.com")

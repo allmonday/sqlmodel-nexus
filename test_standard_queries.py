@@ -37,13 +37,13 @@ class TestUserWithQueries(TestBase, table=False):
     age: int | None = None
 
     @query
-    async def by_id(cls, id: int, query_meta=None) -> TestUserWithQueries | None:
+    async def by_id(cls, id: int) -> TestUserWithQueries | None:
         """Get user by ID."""
         return TestUserWithQueries(id=id, name=f"User {id}", email=f"user{id}@test.com")
 
     @query
     async def by_filter(
-        cls, filter: TestUserFilterInput, limit: int = 10, query_meta=None
+        cls, filter: TestUserFilterInput, limit: int = 10
     ) -> list[TestUserWithQueries]:
         """Get users by filter."""
         users = []

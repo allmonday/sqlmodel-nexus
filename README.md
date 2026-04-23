@@ -3,7 +3,7 @@
 
 [![pypi](https://img.shields.io/pypi/v/sqlmodel-graphql.svg)](https://pypi.python.org/pypi/sqlmodel-graphql)
 [![PyPI Downloads](https://static.pepy.tech/badge/sqlmodel-graphql/month)](https://pepy.tech/projects/sqlmodel-graphql)
-![Python Versions](https://img.shields.io/pypi/pyversions/sqlmodel-graphql)
+![Python Versions](https://img.shields.io/pypi/pyversion/sqlmodel-graphql)
 
 **From SQLModel to Running GraphQL API + MCP Server in Minutes**
 
@@ -13,7 +13,7 @@ sqlmodel-graphql is the fastest way to build a minimum viable system:
 - **@query/@mutation Decorators** - Mark methods, get endpoints instantly
 - **GraphiQL Built-in** - Interactive debugging playground
 - **One-Line MCP Server** - Expose APIs to AI assistants
-- **Auto N+1 Prevention** - Query optimization handled for you
+- **Auto N+1 Prevention** - DataLoader batch loading for relationships
 
 No schema files. No resolvers. No boilerplate.
 Just add decorators to your SQLModel classes.
@@ -65,9 +65,9 @@ Run: `uvicorn app:app` and visit `http://localhost:8000/graphql` for the interac
 - **GraphiQL Integration** - Built-in playground for testing and debugging
 
 ### Smart Optimization
-- **Auto N+1 Prevention** - `selectinload` and `load_only` generated automatically
-- **Query-Aware Loading** - Only fetch requested fields and relationships
-- **QueryMeta Injection** - Framework analyzes queries and optimizes database calls
+- **Auto N+1 Prevention** - DataLoader batch loading for all relationships
+- **Level-by-Level Resolution** - Relationships loaded in batches per depth level
+- **Paginated Relationships** - Built-in cursor-free pagination for list relationships
 
 ### AI-Ready with MCP
 - **One-Line MCP Server** - `config_simple_mcp_server(base=BaseEntity)`
@@ -92,7 +92,7 @@ uv add sqlmodel-graphql[fastmcp]  # include mcp server
 running GraphQL demo:
 
 ```bash
-uv run python -m demo.app 
+uv run python -m demo.app
 # and visit localhost:8000/graphql
 ```
 
@@ -111,7 +111,7 @@ uv run --with fastmcp python -m demo.mcp_server --http   # http mode
 ```python
 from typing import Optional
 from sqlmodel import SQLModel, Field, Relationship, select
-from sqlmodel_graphql import query, mutation, QueryMeta
+from sqlmodel_graphql import query, mutation
 
 class BaseEntity(SQLModel):
     """Base class for all entities."""
@@ -121,45 +121,37 @@ class User(BaseEntity, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     email: str
-    posts: list["Post"] = Relationship(back_populates="author")
+    posts: list["Post"] = Relationship(
+        back_populates="author",
+        sa_relationship_kwargs={"order_by": "Post.id"},
+    )
 
     @query
-    async def get_all(cls, limit: int = 10, query_meta: QueryMeta | None = None) -> list['User']:
-        """Get all users with optional query optimization."""
+    async def get_all(cls, limit: int = 10) -> list['User']:
+        """Get all users."""
         async with get_session() as session:
             stmt = select(cls).limit(limit)
-            if query_meta:
-                # Apply optimization: only load requested fields and relationships
-                stmt = stmt.options(*query_meta.to_options(cls))
             result = await session.exec(stmt)
             return list(result.all())
     # Generates GraphQL field: userGetAll(limit: Int): [User!]!
 
     @query
-    async def get_by_id(cls, id: int, query_meta: QueryMeta | None = None) -> Optional['User']:
+    async def get_by_id(cls, id: int) -> Optional['User']:
         """Get a user by ID."""
         async with get_session() as session:
             stmt = select(cls).where(cls.id == id)
-            if query_meta:
-                stmt = stmt.options(*query_meta.to_options(cls))
             result = await session.exec(stmt)
             return result.first()
     # Generates GraphQL field: userGetById(id: Int!): User
 
     @mutation
-    async def create(cls, name: str, email: str, query_meta: QueryMeta | None = None) -> 'User':
-        """Create a new user. query_meta is injected for relationship loading."""
+    async def create(cls, name: str, email: str) -> 'User':
+        """Create a new user."""
         async with get_session() as session:
             user = cls(name=name, email=email)
             session.add(user)
             await session.commit()
             await session.refresh(user)
-            # Re-query with query_meta to load relationships if requested
-            if query_meta:
-                stmt = select(cls).where(cls.id == user.id)
-                stmt = stmt.options(*query_meta.to_options(cls))
-                result = await session.exec(stmt)
-                return result.first()
             return user
     # Generates GraphQL field: userCreate(name: String!, email: String!): User!
 
@@ -171,152 +163,70 @@ class Post(BaseEntity, table=True):
     author: Optional[User] = Relationship(back_populates="posts")
 ```
 
-### Understanding query_meta
-
-The `query_meta` parameter is automatically injected by the framework to optimize your database queries. It analyzes the GraphQL query's field selections and generates SQLAlchemy optimizations to prevent N+1 queries.
-
-**How it works:**
-
-1. Framework parses GraphQL query: `{ userGetAll { name posts { title } } }`
-2. Creates QueryMeta with field selections and relationships
-3. Injects it into your `@query` method (if the parameter exists)
-4. `query_meta.to_options(Entity)` generates optimized SQLAlchemy options
-
-**Benefits:**
-
-- **Automatic N+1 Prevention**: Related data is loaded in batches, not individual queries
-- **Field Selection**: Only requested fields are loaded from database
-- **Zero Configuration**: Works automatically, no manual optimization needed
-
-**Example transformation:**
-
-```
-GraphQL Query:                         SQLAlchemy Optimization:
-────────────────                      ────────────────────────
-{ userGetAll {                         select(User).options(
-  name                                   load_only(User.name),
-  posts {                                selectinload(User.posts).options(
-    title                                  load_only(Post.title)
-  }                                      )
-}                                      )
-```
-
-Without `query_meta`, loading 10 users with posts would execute:
-- 1 query for users
-- 10 queries for posts (N+1 problem!)
-
-With `query_meta`, it executes:
-- 1 query for users
-- 1 query for all posts (batched!)
-
-**Usage Pattern:**
-
-```python
-@query
-async def get_users(cls, query_meta: QueryMeta | None = None) -> list['User']:
-    async with get_session() as session:
-        stmt = select(cls)
-        if query_meta:
-            stmt = stmt.options(*query_meta.to_options(cls))
-        result = await session.exec(stmt)
-        return list(result.all())
-# Generates: userGetUsers: [User!]!
-```
-
-**Key Points:**
-
-- `query_meta` is optional (`QueryMeta | None = None`) - only injected if the parameter exists
-- Always check `if query_meta:` before using
-- Works with nested relationships of any depth
-- For mutations, only injected when returning entity types (not scalars)
+**Note on relationships:** For list relationships, add `sa_relationship_kwargs={"order_by": "Entity.column"}` to enable pagination support.
 
 ### 2. Create Handler (Auto-generates SDL)
 
 ```python
 from sqlmodel_graphql import GraphQLHandler
 
-# Create handler - SDL is auto-generated from your models
-handler = GraphQLHandler(base=BaseEntity)
+# With pagination support:
+handler = GraphQLHandler(
+    base=BaseEntity,
+    session_factory=async_session,
+    enable_pagination=True,
+)
 
 # Get the SDL if needed
 sdl = handler.get_sdl()
 print(sdl)
 ```
 
-Output:
-
-```graphql
-type User {
-  id: Int
-  name: String!
-  email: String!
-  posts: [Post!]!
-}
-
-type Post {
-  id: Int
-  title: String!
-  content: String!
-  author_id: Int!
-  author: User
-}
-
-type Query {
-  """Get all users with optional query optimization."""
-  userGetAll(limit: Int): [User!]!
-
-  """Get a user by ID."""
-  userGetById(id: Int!): User
-}
-
-type Mutation {
-  """Create a new user. query_meta is injected for relationship loading."""
-  userCreate(name: String!, email: String!): User!
-}
-```
-
-### 3. Execute Queries with GraphQLHandler
+### 3. Execute Queries
 
 > **Try it live:** Run ` uv run uvicorn demo.app:app --reload` to start a FastAPI server with GraphiQL at http://localhost:8000/graphql
 
 ```python
 from sqlmodel_graphql import GraphQLHandler
 
-# Create handler with base class - auto-discovers all entities
-handler = GraphQLHandler(base=BaseEntity)
+handler = GraphQLHandler(
+    base=BaseEntity,
+    session_factory=async_session,
+    enable_pagination=True,
+)
 
-# Execute a GraphQL query
+# Relationships are resolved via DataLoader (no N+1)
 result = await handler.execute("""
 {
   userGetAll(limit: 5) {
     id
     name
-    posts {
-      title
-      author {
-        name
+    posts(limit: 3) {
+      items {
+        title
+        author { name }
       }
+      pagination { has_more total_count }
     }
   }
 }
 """)
-
-# Result includes nested relationships automatically:
-# {
-#   "data": {
-#     "userGetAll": [
-#       {
-#         "id": 1,
-#         "name": "Alice",
-#         "posts": [
-#           {"title": "Hello World", "author": {"name": "Alice"}},
-#           {"title": "GraphQL Tips", "author": {"name": "Alice"}}
-#         ]
-#       }
-#     ]
-#   }
-# }
 ```
+
+### How Relationship Resolution Works
+
+Relationships are resolved automatically via DataLoader — no manual eager loading needed.
+
+**Execution flow:**
+1. Root `@query` method returns entity instances (scalar fields only)
+2. Framework walks the GraphQL selection tree level-by-level
+3. At each level, collects FK values and batch-loads relationships via DataLoader
+4. For paginated lists, uses `ROW_NUMBER()` window functions for efficient per-parent pagination
+
+**Benefits:**
+- **Automatic N+1 Prevention**: All relationships loaded in batched queries
+- **Pagination Support**: `limit`/`offset` on list relationships with `has_more` and `total_count`
+- **Zero Configuration**: No `selectinload` or `load_only` needed in user code
 
 ## Auto-Generated Standard Queries
 
@@ -334,7 +244,12 @@ config = AutoQueryConfig(
     generate_by_filter=True,         # Generate by_filter query
 )
 
-handler = GraphQLHandler(base=BaseEntity, auto_query_config=config)
+handler = GraphQLHandler(
+    base=BaseEntity,
+    auto_query_config=config,
+    session_factory=async_session,
+    enable_pagination=True,
+)
 ```
 
 When `auto_query_config` is provided, the handler discovers **all** entity subclasses (not only those with decorators) and attaches standard queries.
@@ -517,7 +432,7 @@ Mark a method as a GraphQL query. The field name is auto-generated as `{entityNa
 
 ```python
 @query
-async def get_all(cls, limit: int = 10, query_meta: Optional[QueryMeta] = None) -> list['User']:
+async def get_all(cls, limit: int = 10) -> list['User']:
     """Get all users."""  # Docstring becomes the field description
     ...
 # Generates: userGetAll(limit: Int): [User!]!
@@ -529,34 +444,26 @@ Mark a method as a GraphQL mutation. The field name is auto-generated as `{entit
 
 ```python
 @mutation
-async def create(cls, name: str, email: str, query_meta: QueryMeta = None) -> 'User':
+async def create(cls, name: str, email: str) -> 'User':
     """Create a new user."""
-    async with get_session() as session:
-        user = cls(name=name, email=email)
-        session.add(user)
-        await session.commit()
-        await session.refresh(user)
-        # Re-query with query_meta to load relationships if needed
-        if query_meta:
-            stmt = select(cls).where(cls.id == user.id)
-            stmt = stmt.options(*query_meta.to_options(cls))
-            result = await session.exec(stmt)
-            return result.first()
-        return user
+    ...
 # Generates: userCreate(name: String!, email: String!): User!
 ```
 
-**Note:** `query_meta` is only injected when the method has the parameter in its signature AND the return type is an entity. For scalar returns (e.g., `bool`, `str`), it is not passed.
+### `GraphQLHandler`
 
-### `GraphQLHandler(base)`
 Execute GraphQL queries against SQLModel entities with auto-discovery.
 
 ```python
-# Recommended: Use base class for auto-discovery
-handler = GraphQLHandler(base=BaseEntity)
+# Recommended: Use base class with session_factory
+handler = GraphQLHandler(
+    base=BaseEntity,
+    session_factory=async_session,
+    enable_pagination=True,
+)
 
 # Execute queries
-result = await handler.execute("{ users { id name } }")
+result = await handler.execute("{ userGetAll { id name posts { items { title } } } }")
 
 # Get SDL
 sdl = handler.get_sdl()
@@ -566,35 +473,22 @@ html = handler.get_graphiql_html()  # defaults to /graphql endpoint
 html = handler.get_graphiql_html(endpoint="/api/graphql")  # custom endpoint
 ```
 
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `base` | `type` | Required | SQLModel base class for entity discovery. |
+| `session_factory` | `Callable \| None` | `None` | Async session factory for DataLoader queries. Required for relationship resolution. |
+| `auto_query_config` | `AutoQueryConfig \| None` | `None` | Auto-generate by_id/by_filter queries. |
+| `enable_pagination` | `bool` | `False` | Enable pagination for list relationships. |
+| `query_description` | `str \| None` | `None` | Custom description for Query type. |
+| `mutation_description` | `str \| None` | `None` | Custom description for Mutation type. |
+
 **Auto-Discovery Features:**
 - Automatically finds all SQLModel subclasses with `@query/@mutation` decorators
 - Includes all related entities through Relationship fields
 - Supports custom base classes for better organization
 - Recursive discovery of nested relationships
-
-### `QueryParser()`
-
-Parse GraphQL queries to QueryMeta.
-
-```python
-parser = QueryParser()
-metas = parser.parse("{ users { id name } }")
-# metas['users'] -> QueryMeta(fields=[...], relationships={...})
-```
-
-### `QueryMeta`
-
-Metadata extracted from GraphQL selection set.
-
-```python
-@dataclass
-class QueryMeta:
-    fields: list[FieldSelection]
-    relationships: dict[str, RelationshipSelection]
-
-    def to_options(self, entity: type[SQLModel]) -> list[Any]:
-        """Convert to SQLAlchemy options for query optimization."""
-```
 
 ## License
 

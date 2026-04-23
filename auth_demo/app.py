@@ -23,7 +23,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 from pydantic import BaseModel
 
 from auth_demo.auth import require_admin
-from auth_demo.database import init_db
+from auth_demo.database import async_session, init_db
 from auth_demo.models import BaseEntity
 from sqlmodel_graphql import GraphQLHandler
 
@@ -37,7 +37,7 @@ class GraphQLRequest(BaseModel):
 
 
 # Create GraphQL handler
-handler = GraphQLHandler(base=BaseEntity)
+handler = GraphQLHandler(base=BaseEntity, session_factory=async_session)
 
 
 @asynccontextmanager

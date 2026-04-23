@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Optional
 
 import pytest
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, Relationship, SQLModel
 
 from sqlmodel_graphql import GraphQLHandler, mutation, query
 from sqlmodel_graphql.introspection import IntrospectionGenerator
@@ -38,6 +38,59 @@ class IntrospectionUser(IntrospectionBase, table=True):
     @mutation
     def create_user(cls, name: str, email: str | None = None) -> "IntrospectionUser":
         return cls(name=name, email=email)
+
+
+# ---------------------------------------------------------------------------
+# Entities with FK + Relationship for FK filtering tests
+# ---------------------------------------------------------------------------
+
+class IntrospectionAuthor(IntrospectionBase, table=True):
+    __tablename__ = "introspection_author"
+    id: int = Field(default=None, primary_key=True)
+    name: str
+    articles: list["IntrospectionArticle"] = Relationship(back_populates="author")
+
+    @query
+    def get_all(cls) -> list["IntrospectionAuthor"]:
+        return []
+
+
+class IntrospectionArticle(IntrospectionBase, table=True):
+    __tablename__ = "introspection_article"
+    id: int = Field(default=None, primary_key=True)
+    title: str
+    author_id: int = Field(foreign_key="introspection_author.id")
+    author: IntrospectionAuthor | None = Relationship(back_populates="articles")
+
+
+# ---------------------------------------------------------------------------
+# Base for paginated introspection tests (requires table=True + session)
+# ---------------------------------------------------------------------------
+
+class PagBase(SQLModel):
+    """Base class for paginated introspection test entities."""
+    pass
+
+
+class PagAuthor(PagBase, table=True):
+    __tablename__ = "pag_introspection_author"
+    id: int = Field(default=None, primary_key=True)
+    name: str
+    posts: list["PagPost"] = Relationship(
+        sa_relationship_kwargs={"order_by": "PagPost.id"},
+    )
+
+    @query
+    def get_all(cls) -> list["PagAuthor"]:
+        return []
+
+
+class PagPost(PagBase, table=True):
+    __tablename__ = "pag_introspection_post"
+    id: int = Field(default=None, primary_key=True)
+    title: str
+    author_id: int = Field(foreign_key="pag_introspection_author.id")
+    author: PagAuthor | None = Relationship()
 
 
 class TestIntrospectionGenerator:
@@ -330,3 +383,188 @@ class TestCustomDescriptions:
         assert query_type["description"] is None
         assert mutation_type is not None
         assert mutation_type["description"] is None
+
+
+class TestFKFieldFiltering:
+    """Tests for FK field filtering in introspection."""
+
+    @pytest.fixture
+    def handler(self) -> GraphQLHandler:
+        return GraphQLHandler(base=IntrospectionBase)
+
+    def test_fk_fields_excluded_from_entity_type(
+        self, handler: GraphQLHandler,
+    ) -> None:
+        """FK fields should not appear in introspection entity types."""
+        schema = handler._introspection_generator.generate()
+
+        article_type = next(
+            (t for t in schema["types"] if t["name"] == "IntrospectionArticle"),
+            None,
+        )
+        assert article_type is not None
+
+        field_names = [f["name"] for f in article_type["fields"]]
+        # author_id is a FK field — should be excluded
+        assert "author_id" not in field_names
+        # title and id are regular fields — should be included
+        assert "id" in field_names
+        assert "title" in field_names
+        # author is a relationship field — should be included
+        assert "author" in field_names
+
+    def test_entity_without_fk_has_all_fields(
+        self, handler: GraphQLHandler,
+    ) -> None:
+        """Entity without FK fields should show all its scalar fields."""
+        schema = handler._introspection_generator.generate()
+
+        author_type = next(
+            (t for t in schema["types"] if t["name"] == "IntrospectionAuthor"),
+            None,
+        )
+        assert author_type is not None
+
+        field_names = [f["name"] for f in author_type["fields"]]
+        assert "id" in field_names
+        assert "name" in field_names
+
+
+class _DummySessionFactory:
+    """A no-op session factory for testing pagination introspection."""
+
+    def __call__(self):
+        return self
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        pass
+
+
+class TestPaginationIntrospection:
+    """Tests for pagination types in introspection."""
+
+    @pytest.fixture
+    def handler(self) -> GraphQLHandler:
+        return GraphQLHandler(
+            base=PagBase,
+            session_factory=_DummySessionFactory(),
+            enable_pagination=True,
+        )
+
+    def test_pagination_type_present(self, handler: GraphQLHandler) -> None:
+        """Pagination type should be in schema when enable_pagination=True."""
+        schema = handler._introspection_generator.generate()
+        type_names = [t["name"] for t in schema["types"]]
+        assert "Pagination" in type_names
+
+    def test_pagination_type_fields(self, handler: GraphQLHandler) -> None:
+        """Pagination type should have has_more and total_count fields."""
+        schema = handler._introspection_generator.generate()
+        pag_type = next(
+            (t for t in schema["types"] if t["name"] == "Pagination"), None
+        )
+        assert pag_type is not None
+        field_names = [f["name"] for f in pag_type["fields"]]
+        assert "has_more" in field_names
+        assert "total_count" in field_names
+
+    def test_result_type_present(self, handler: GraphQLHandler) -> None:
+        """Result type should be generated for paginated list relationships."""
+        schema = handler._introspection_generator.generate()
+        type_names = [t["name"] for t in schema["types"]]
+        assert "PagPostResult" in type_names
+
+    def test_result_type_fields(self, handler: GraphQLHandler) -> None:
+        """Result type should have items and pagination fields."""
+        schema = handler._introspection_generator.generate()
+        result_type = next(
+            (t for t in schema["types"] if t["name"] == "PagPostResult"), None
+        )
+        assert result_type is not None
+        field_names = [f["name"] for f in result_type["fields"]]
+        assert "items" in field_names
+        assert "pagination" in field_names
+
+    def test_result_type_items_inner_type(self, handler: GraphQLHandler) -> None:
+        """Result type items field should reference the target entity."""
+        schema = handler._introspection_generator.generate()
+        result_type = next(
+            (t for t in schema["types"] if t["name"] == "PagPostResult"), None
+        )
+        assert result_type is not None
+        items_field = next(
+            (f for f in result_type["fields"] if f["name"] == "items"), None
+        )
+        assert items_field is not None
+        # items is NON_NULL(LIST(NON_NULL(OBJECT(PagPost))))
+        t = items_field["type"]
+        assert t["kind"] == "NON_NULL"
+        t = t["ofType"]
+        assert t["kind"] == "LIST"
+        t = t["ofType"]
+        assert t["kind"] == "NON_NULL"
+        t = t["ofType"]
+        assert t["kind"] == "OBJECT"
+        assert t["name"] == "PagPost"
+
+    def test_list_relationship_uses_result_type(
+        self, handler: GraphQLHandler,
+    ) -> None:
+        """Paginated list relationship field should reference Result type."""
+        schema = handler._introspection_generator.generate()
+        author_type = next(
+            (t for t in schema["types"] if t["name"] == "PagAuthor"), None
+        )
+        assert author_type is not None
+        posts_field = next(
+            (f for f in author_type["fields"] if f["name"] == "posts"), None
+        )
+        assert posts_field is not None
+        # Type should be NON_NULL(OBJECT(PagPostResult))
+        t = posts_field["type"]
+        assert t["kind"] == "NON_NULL"
+        t = t["ofType"]
+        assert t["kind"] == "OBJECT"
+        assert t["name"] == "PagPostResult"
+
+    def test_list_relationship_has_pagination_args(
+        self, handler: GraphQLHandler,
+    ) -> None:
+        """Paginated list relationship field should have limit/offset args."""
+        schema = handler._introspection_generator.generate()
+        author_type = next(
+            (t for t in schema["types"] if t["name"] == "PagAuthor"), None
+        )
+        assert author_type is not None
+        posts_field = next(
+            (f for f in author_type["fields"] if f["name"] == "posts"), None
+        )
+        assert posts_field is not None
+        arg_names = [a["name"] for a in posts_field["args"]]
+        assert "limit" in arg_names
+        assert "offset" in arg_names
+
+    def test_non_paginated_handler_no_pagination_types(self) -> None:
+        """When enable_pagination=False, no Pagination/Result types."""
+        handler = GraphQLHandler(base=PagBase, session_factory=_DummySessionFactory())
+        schema = handler._introspection_generator.generate()
+        type_names = [t["name"] for t in schema["types"]]
+        assert "Pagination" not in type_names
+        assert "PagPostResult" not in type_names
+
+    def test_fk_fields_excluded_in_paginated_entities(
+        self, handler: GraphQLHandler,
+    ) -> None:
+        """FK fields should be excluded even in paginated entities."""
+        schema = handler._introspection_generator.generate()
+        post_type = next(
+            (t for t in schema["types"] if t["name"] == "PagPost"), None
+        )
+        assert post_type is not None
+        field_names = [f["name"] for f in post_type["fields"]]
+        assert "author_id" not in field_names
+        assert "id" in field_names
+        assert "title" in field_names

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from sqlmodel import Field, Relationship, SQLModel
 
-from sqlmodel_graphql import GraphQLHandler, QueryMeta, mutation, query
+from sqlmodel_graphql import GraphQLHandler, mutation, query
 
 
 # Define test base class
@@ -24,7 +24,7 @@ class HandlerTestUser(HandlerTestBase, table=False):
 
     @query
     async def get_all(
-        cls, limit: int = 10, query_meta: QueryMeta | None = None
+        cls, limit: int = 10
     ) -> list[HandlerTestUser]:
         """Get all test users."""
         return [
@@ -34,7 +34,7 @@ class HandlerTestUser(HandlerTestBase, table=False):
 
     @query
     async def get_by_id(
-        cls, id: int, query_meta: QueryMeta | None = None
+        cls, id: int
     ) -> HandlerTestUser | None:
         """Get test user by ID."""
         return HandlerTestUser(id=id, name="Test", email="test@example.com")
@@ -48,12 +48,12 @@ class HandlerTestPost(HandlerTestBase, table=False):
     content: str = ""
 
     @query
-    async def get_all(cls, query_meta: QueryMeta | None = None) -> list[HandlerTestPost]:
+    async def get_all(cls) -> list[HandlerTestPost]:
         """Get all test posts."""
         return []
 
     @mutation
-    async def create(cls, title: str, content: str, query_meta: QueryMeta) -> HandlerTestPost:
+    async def create(cls, title: str, content: str) -> HandlerTestPost:
         """Create a test post."""
         return HandlerTestPost(id=1, title=title, content=content)
 
@@ -232,7 +232,7 @@ class HandlerTestListArg(HandlerTestBase, table=False):
 
     @query
     async def get_by_tags(
-        cls, tags: list[str], query_meta: QueryMeta | None = None
+        cls, tags: list[str]
     ) -> list[HandlerTestListArg]:
         """Get items by tags list."""
         return [HandlerTestListArg(id=i, tags=tags) for i in range(len(tags))]
@@ -283,14 +283,14 @@ class HandlerTestListMutation(HandlerTestBase, table=False):
 
     @mutation
     async def create_with_items(
-        cls, title: str, items: list[str], query_meta: QueryMeta | None = None
+        cls, title: str, items: list[str]
     ) -> HandlerTestListMutation:
         """Create entity with list of strings."""
         return HandlerTestListMutation(id=1, title=title, items=items)
 
     @mutation
     async def create_with_numbers(
-        cls, numbers: list[int], query_meta: QueryMeta | None = None
+        cls, numbers: list[int]
     ) -> HandlerTestListMutation:
         """Create entity with list of integers."""
         return HandlerTestListMutation(id=1, numbers=numbers)
@@ -301,7 +301,6 @@ class HandlerTestListMutation(HandlerTestBase, table=False):
         title: str,
         items: list[str],
         numbers: list[int],
-        query_meta: QueryMeta | None = None,
     ) -> HandlerTestListMutation:
         """Create entity with multiple list arguments."""
         return HandlerTestListMutation(id=1, title=title, items=items, numbers=numbers)

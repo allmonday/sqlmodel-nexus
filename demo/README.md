@@ -104,7 +104,7 @@ demo/
 ├── __init__.py     # Package init
 ├── app.py          # FastAPI app with GraphiQL
 ├── models.py       # SQLModel entities with @query/@mutation
-├── database.py     # Database configuration
+├── database.py     # Database configuration and seed data
 └── README.md       # This file
 ```
 
@@ -113,4 +113,5 @@ demo/
 1. **Entities** (`models.py`): Define SQLModel classes with `@query` and `@mutation` decorators
 2. **Handler** (`app.py`): `GraphQLHandler` scans entities and builds query/mutation mappings
 3. **Execution**: When a query comes in, the handler parses it and calls the appropriate methods
-4. **Optimization**: `QueryMeta` is passed to methods for SQLAlchemy query optimization
+4. **Relationships**: DataLoader batch-loads related entities level-by-level (no N+1)
+5. **Pagination**: List relationships with `order_by` support `limit`/`offset` pagination

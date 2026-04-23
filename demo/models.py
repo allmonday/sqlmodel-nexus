@@ -4,7 +4,7 @@ from typing import Optional
 
 from sqlmodel import Field, Relationship, SQLModel, select
 
-from sqlmodel_graphql import QueryMeta, mutation, query
+from sqlmodel_graphql import mutation, query
 
 
 class BaseEntity(SQLModel):
@@ -30,11 +30,7 @@ class CreatePostInput(SQLModel):
 
 
 class UserFavoritePost(BaseEntity, table=True):
-    """User-Post favorite relationship (many-to-many link table).
-
-    This is a link table connecting User and Post in a many-to-many relationship.
-    Following SQLModel best practices, we only define the foreign keys here.
-    """
+    """User-Post favorite relationship (many-to-many link table)."""
 
     __tablename__ = "user_favorite_post"
 
@@ -50,55 +46,53 @@ class User(BaseEntity, table=True):
     email: str
 
     # Relationship: User has many posts
-    posts: list["Post"] = Relationship(back_populates="author")
+    posts: list["Post"] = Relationship(
+        back_populates="author",
+        sa_relationship_kwargs={"order_by": "Post.id"},
+    )
 
     # Relationship: User has many comments
-    comments: list["Comment"] = Relationship(back_populates="author")
+    comments: list["Comment"] = Relationship(
+        back_populates="author",
+        sa_relationship_kwargs={"order_by": "Comment.id"},
+    )
 
     # Relationship: User has many favorite posts (many-to-many, through link table)
     favorite_posts: list["Post"] = Relationship(
         back_populates="favorited_by_users",
-        link_model=UserFavoritePost
+        link_model=UserFavoritePost,
+        sa_relationship_kwargs={"order_by": "Post.id"},
     )
 
     @query
-    async def get_users(cls, limit: int = 10, query_meta: QueryMeta | None = None) -> list["User"]:
+    async def get_users(cls, limit: int = 10) -> list["User"]:
         """Get all users with optional limit."""
         from demo.database import async_session
 
         async with async_session() as session:
             stmt = select(cls).limit(limit)
-            if query_meta:
-                stmt = stmt.options(*query_meta.to_options(cls))
             result = await session.exec(stmt)
             return list(result.all())
 
     @query
-    async def get_user(cls, id: int, query_meta: QueryMeta | None = None) -> Optional["User"]:
+    async def get_user(cls, id: int) -> Optional["User"]:
         """Get a user by ID."""
         from demo.database import async_session
 
         async with async_session() as session:
             stmt = select(cls).where(cls.id == id)
-            if query_meta:
-                stmt = stmt.options(*query_meta.to_options(cls))
             result = await session.exec(stmt)
             return result.first()
 
     @mutation
-    async def create_user(
-        cls, name: str, email: str, query_meta: QueryMeta | None = None
-    ) -> "User":
+    async def create_user(cls, name: str, email: str) -> "User":
         """Create a new user (idempotent)."""
         from demo.database import async_session
 
         async with async_session() as session:
-            # Idempotency check: return existing user if email already exists
             existing = await session.exec(select(cls).where(cls.email == email))
             if existing.first():
                 stmt = select(cls).where(cls.id == existing.first().id)
-                if query_meta:
-                    stmt = stmt.options(*query_meta.to_options(cls))
                 result = await session.exec(stmt)
                 return result.first()
 
@@ -107,27 +101,19 @@ class User(BaseEntity, table=True):
             await session.commit()
             await session.refresh(user)
 
-            # Re-query with query_meta to load relationships
             stmt = select(cls).where(cls.id == user.id)
-            if query_meta:
-                stmt = stmt.options(*query_meta.to_options(cls))
             result = await session.exec(stmt)
             return result.first()
 
     @mutation
-    async def create_user_with_input(
-        cls, input: CreateUserInput, query_meta: QueryMeta | None = None
-    ) -> "User":
+    async def create_user_with_input(cls, input: CreateUserInput) -> "User":
         """Create a new user using Input type (idempotent)."""
         from demo.database import async_session
 
         async with async_session() as session:
-            # Idempotency check: return existing user if email already exists
             existing = await session.exec(select(cls).where(cls.email == input.email))
             if existing.first():
                 stmt = select(cls).where(cls.id == existing.first().id)
-                if query_meta:
-                    stmt = stmt.options(*query_meta.to_options(cls))
                 result = await session.exec(stmt)
                 return result.first()
 
@@ -136,40 +122,29 @@ class User(BaseEntity, table=True):
             await session.commit()
             await session.refresh(user)
 
-            # Re-query with query_meta to load relationships
             stmt = select(cls).where(cls.id == user.id)
-            if query_meta:
-                stmt = stmt.options(*query_meta.to_options(cls))
             result = await session.exec(stmt)
             return result.first()
 
     @mutation
-    async def add_favorite(
-        cls, user_id: int, post_id: int, query_meta: QueryMeta | None = None
-    ) -> "User":
+    async def add_favorite(cls, user_id: int, post_id: int) -> "User":
         """Add a post to user's favorites (idempotent)."""
         from demo.database import async_session
 
         async with async_session() as session:
-            # Get user
             user = await session.get(cls, user_id)
             if not user:
                 raise ValueError("User not found")
 
-            # Get post
             post = await session.get(Post, post_id)
             if not post:
                 raise ValueError("Post not found")
 
-            # Check if already favorited (idempotent)
             if post not in user.favorite_posts:
                 user.favorite_posts.append(post)
                 await session.commit()
 
-            # Return user with relationships loaded
             stmt = select(cls).where(cls.id == user_id)
-            if query_meta:
-                stmt = stmt.options(*query_meta.to_options(cls))
             result = await session.exec(stmt)
             return result.first()
 
@@ -206,68 +181,61 @@ class Post(BaseEntity, table=True):
     author: Optional["User"] = Relationship(back_populates="posts")
 
     # Relationship: Post has many comments
-    comments: list["Comment"] = Relationship(back_populates="post")
+    comments: list["Comment"] = Relationship(
+        back_populates="post",
+        sa_relationship_kwargs={"order_by": "Comment.id"},
+    )
 
     # Relationship: Post has many favoriting users (many-to-many, through link table)
     favorited_by_users: list["User"] = Relationship(
         back_populates="favorite_posts",
-        link_model=UserFavoritePost
+        link_model=UserFavoritePost,
+        sa_relationship_kwargs={"order_by": "User.id"},
     )
 
     @query
-    async def get_posts(cls, limit: int = 10, query_meta: QueryMeta | None = None) -> list["Post"]:
+    async def get_posts(cls, limit: int = 10) -> list["Post"]:
         """Get all posts with optional limit."""
         from demo.database import async_session
 
         async with async_session() as session:
             stmt = select(cls).limit(limit)
-            if query_meta:
-                stmt = stmt.options(*query_meta.to_options(cls))
             result = await session.exec(stmt)
             return list(result.all())
 
     @query
-    async def get_post(cls, id: int, query_meta: QueryMeta | None = None) -> Optional["Post"]:
+    async def get_post(cls, id: int) -> Optional["Post"]:
         """Get a post by ID."""
         from demo.database import async_session
 
         async with async_session() as session:
             stmt = select(cls).where(cls.id == id)
-            if query_meta:
-                stmt = stmt.options(*query_meta.to_options(cls))
             result = await session.exec(stmt)
             return result.first()
 
     @query
     async def get_posts_by_author(
-        cls, author_id: int, limit: int = 10, query_meta: QueryMeta | None = None
+        cls, author_id: int, limit: int = 10
     ) -> list["Post"]:
         """Get posts by author ID."""
         from demo.database import async_session
 
         async with async_session() as session:
             stmt = select(cls).where(cls.author_id == author_id).limit(limit)
-            if query_meta:
-                stmt = stmt.options(*query_meta.to_options(cls))
             result = await session.exec(stmt)
             return list(result.all())
 
     @mutation
-    async def create_post(
-        cls, title: str, content: str, author_id: int, query_meta: QueryMeta | None = None
-    ) -> "Post":
+    async def create_post(cls, title: str, content: str, author_id: int) -> "Post":
         """Create a new post (idempotent)."""
         from demo.database import async_session
 
         async with async_session() as session:
-            # Idempotency check: return existing post if same title + author
             existing = await session.exec(
                 select(cls).where(cls.title == title, cls.author_id == author_id)
             )
             if existing.first():
                 stmt = select(cls).where(cls.id == existing.first().id)
-                if query_meta:
-                    stmt = stmt.options(*query_meta.to_options(cls))
                 result = await session.exec(stmt)
                 return result.first()
 
@@ -276,29 +244,21 @@ class Post(BaseEntity, table=True):
             await session.commit()
             await session.refresh(post)
 
-            # Re-query with query_meta to load relationships
             stmt = select(cls).where(cls.id == post.id)
-            if query_meta:
-                stmt = stmt.options(*query_meta.to_options(cls))
             result = await session.exec(stmt)
             return result.first()
 
     @mutation
-    async def create_post_with_input(
-        cls, input: CreatePostInput, query_meta: QueryMeta | None = None
-    ) -> "Post":
+    async def create_post_with_input(cls, input: CreatePostInput) -> "Post":
         """Create a new post using Input type (idempotent)."""
         from demo.database import async_session
 
         async with async_session() as session:
-            # Idempotency check: return existing post if same title + author
             existing = await session.exec(
                 select(cls).where(cls.title == input.title, cls.author_id == input.author_id)
             )
             if existing.first():
                 stmt = select(cls).where(cls.id == existing.first().id)
-                if query_meta:
-                    stmt = stmt.options(*query_meta.to_options(cls))
                 result = await session.exec(stmt)
                 return result.first()
 
@@ -307,10 +267,7 @@ class Post(BaseEntity, table=True):
             await session.commit()
             await session.refresh(post)
 
-            # Re-query with query_meta to load relationships
             stmt = select(cls).where(cls.id == post.id)
-            if query_meta:
-                stmt = stmt.options(*query_meta.to_options(cls))
             result = await session.exec(stmt)
             return result.first()
 
@@ -330,68 +287,57 @@ class Comment(BaseEntity, table=True):
     author: Optional["User"] = Relationship(back_populates="comments")
 
     @query
-    async def get_comments(
-        cls, limit: int = 10, query_meta: QueryMeta | None = None
-    ) -> list["Comment"]:
+    async def get_comments(cls, limit: int = 10) -> list["Comment"]:
         """Get all comments with optional limit."""
         from demo.database import async_session
 
         async with async_session() as session:
             stmt = select(cls).limit(limit)
-            if query_meta:
-                stmt = stmt.options(*query_meta.to_options(cls))
             result = await session.exec(stmt)
             return list(result.all())
 
     @query
-    async def get_comment(cls, id: int, query_meta: QueryMeta | None = None) -> Optional["Comment"]:
+    async def get_comment(cls, id: int) -> Optional["Comment"]:
         """Get a comment by ID."""
         from demo.database import async_session
 
         async with async_session() as session:
             stmt = select(cls).where(cls.id == id)
-            if query_meta:
-                stmt = stmt.options(*query_meta.to_options(cls))
             result = await session.exec(stmt)
             return result.first()
 
     @query
     async def get_comments_by_post(
-        cls, post_id: int, limit: int = 10, query_meta: QueryMeta | None = None
+        cls, post_id: int, limit: int = 10
     ) -> list["Comment"]:
         """Get comments by post ID."""
         from demo.database import async_session
 
         async with async_session() as session:
             stmt = select(cls).where(cls.post_id == post_id).limit(limit)
-            if query_meta:
-                stmt = stmt.options(*query_meta.to_options(cls))
             result = await session.exec(stmt)
             return list(result.all())
 
     @query
     async def get_comments_by_author(
-        cls, author_id: int, limit: int = 10, query_meta: QueryMeta | None = None
+        cls, author_id: int, limit: int = 10
     ) -> list["Comment"]:
         """Get comments by author ID."""
         from demo.database import async_session
 
         async with async_session() as session:
             stmt = select(cls).where(cls.author_id == author_id).limit(limit)
-            if query_meta:
-                stmt = stmt.options(*query_meta.to_options(cls))
             result = await session.exec(stmt)
             return list(result.all())
 
     @mutation
     async def create_comment(
-        cls, content: str, post_id: int, author_id: int, query_meta: QueryMeta | None = None
+        cls, content: str, post_id: int, author_id: int
     ) -> "Comment":
         """Create a new comment (idempotent)."""
         from demo.database import async_session
 
         async with async_session() as session:
-            # Idempotency check: return existing comment if same content + post + author
             existing = await session.exec(
                 select(cls).where(
                     cls.content == content,
@@ -401,8 +347,6 @@ class Comment(BaseEntity, table=True):
             )
             if existing.first():
                 stmt = select(cls).where(cls.id == existing.first().id)
-                if query_meta:
-                    stmt = stmt.options(*query_meta.to_options(cls))
                 result = await session.exec(stmt)
                 return result.first()
 
@@ -411,9 +355,6 @@ class Comment(BaseEntity, table=True):
             await session.commit()
             await session.refresh(comment)
 
-            # Re-query with query_meta to load relationships
             stmt = select(cls).where(cls.id == comment.id)
-            if query_meta:
-                stmt = stmt.options(*query_meta.to_options(cls))
             result = await session.exec(stmt)
             return result.first()

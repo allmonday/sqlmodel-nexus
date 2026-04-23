@@ -30,6 +30,8 @@ class IntrospectionGenerator:
         mutation_methods: dict[str, tuple[type[SQLModel], Callable]],
         query_description: str | None = None,
         mutation_description: str | None = None,
+        enable_pagination: bool = False,
+        loader_registry: Any | None = None,
     ):
         """Initialize the introspection generator.
 
@@ -39,6 +41,8 @@ class IntrospectionGenerator:
             mutation_methods: Mapping of field name to (entity, method) for mutations.
             query_description: Optional custom description for Query type.
             mutation_description: Optional custom description for Mutation type.
+            enable_pagination: When True, list relationships produce Result types.
+            loader_registry: LoaderRegistry for relationship introspection.
         """
         self.entities = entities
         self._entity_names = {e.__name__ for e in entities}
@@ -46,6 +50,8 @@ class IntrospectionGenerator:
         self._mutation_methods = mutation_methods
         self._query_description = query_description
         self._mutation_description = mutation_description
+        self._enable_pagination = enable_pagination
+        self._loader_registry = loader_registry
         # Initialize converter before _collect_enum_types which uses it
         self._converter = TypeConverter(self._entity_names)
         self._enum_types = self._collect_enum_types()
@@ -105,11 +111,15 @@ class IntrospectionGenerator:
         for entity in self.entities:
             types_list.append(self._build_entity_type(entity))
 
-        # 5. Query type
+        # 5. Pagination types (Pagination + Result types)
+        if self._enable_pagination and self._loader_registry:
+            types_list.extend(self._build_pagination_types())
+
+        # 6. Query type
         if self._query_methods:
             types_list.append(self._build_query_type())
 
-        # 6. Mutation type
+        # 7. Mutation type
         if self._mutation_methods:
             types_list.append(self._build_mutation_type())
 
@@ -140,8 +150,10 @@ class IntrospectionGenerator:
         # Collect all fields preserving definition order
         all_fields: list[tuple[str, Any, str | None]] = []
 
-        # Get fields from model_fields
+        # Get fields from model_fields (skip FK fields)
         for field_name, field_info in entity.model_fields.items():
+            if self._is_fk_field(field_info):
+                continue
             description = field_info.description
             all_fields.append((field_name, field_info.annotation, description))
 
@@ -161,7 +173,7 @@ class IntrospectionGenerator:
 
         # Group fields by type (scalar vs object)
         for field_name, type_hint, description in all_fields:
-            field = self._build_field(field_name, type_hint, description)
+            field = self._build_field(field_name, type_hint, description, entity)
             if self._is_scalar_field(type_hint):
                 scalar_fields.append(field)
             else:
@@ -388,17 +400,32 @@ class IntrospectionGenerator:
         return {"kind": "SCALAR", "name": "String", "ofType": None}
 
     def _build_field(
-        self, name: str, python_type: Any, description: str | None = None
+        self,
+        name: str,
+        python_type: Any,
+        description: str | None = None,
+        entity: type[SQLModel] | None = None,
     ) -> dict:
         """Build introspection data for a field."""
         # Check if the type is optional (should not be NON_NULL)
         required = not self._converter.is_optional(python_type)
-        type_ref = self._build_type_ref(python_type, is_input=False, required=required)
+
+        # Check if this is a paginated list relationship
+        args: list[dict] = []
+        if (
+            self._enable_pagination
+            and entity is not None
+            and self._is_paginated_relationship(entity, name, python_type)
+        ):
+            type_ref = self._build_result_type_ref(python_type)
+            args = self._build_pagination_args()
+        else:
+            type_ref = self._build_type_ref(python_type, is_input=False, required=required)
 
         return {
             "name": name,
             "description": description,
-            "args": [],
+            "args": args,
             "type": type_ref,
             "isDeprecated": False,
             "deprecationReason": None,
@@ -525,3 +552,167 @@ class IntrospectionGenerator:
             "enumValues": None,
             "possibleTypes": None,
         }
+
+    def _is_fk_field(self, field_info: Any) -> bool:
+        """Check if a field is a foreign key field (excluded from GraphQL output)."""
+        if hasattr(field_info, "foreign_key") and isinstance(field_info.foreign_key, str):
+            return True
+        if hasattr(field_info, "metadata"):
+            for meta in field_info.metadata:
+                if hasattr(meta, "foreign_key") and isinstance(meta.foreign_key, str):
+                    return True
+        return False
+
+    def _is_paginated_relationship(
+        self,
+        entity: type[SQLModel],
+        field_name: str,
+        python_type: Any,
+    ) -> bool:
+        """Check if a relationship field is paginated."""
+        if not self._loader_registry:
+            return False
+        rel_info = self._loader_registry.get_relationship(entity, field_name)
+        if rel_info is None or rel_info.page_loader is None:
+            return False
+        # Must be a list type — unwrap Mapped first
+        unwrapped = python_type
+        if self._converter.is_mapped_wrapper(python_type):
+            unwrapped = self._converter.unwrap_mapped(python_type)
+        return self._converter.is_list_type(unwrapped)
+
+    def _build_result_type_ref(self, python_type: Any) -> dict:
+        """Build a type reference to a Result type for paginated list relationships."""
+        # Unwrap Mapped wrapper first
+        unwrapped = python_type
+        if self._converter.is_mapped_wrapper(python_type):
+            unwrapped = self._converter.unwrap_mapped(python_type)
+        inner = self._converter.get_list_inner_type(unwrapped)
+        entity_name = self._converter.get_entity_name(inner)
+        if not entity_name:
+            # Fallback to list type
+            return self._build_type_ref(python_type, is_input=False, required=True)
+        result_type_name = f"{entity_name}Result"
+        return {
+            "kind": "NON_NULL",
+            "name": None,
+            "ofType": {"kind": "OBJECT", "name": result_type_name, "ofType": None},
+        }
+
+    def _build_pagination_args(self) -> list[dict]:
+        """Build limit/offset arguments for paginated relationship fields."""
+        return [
+            {
+                "name": "limit",
+                "description": "Maximum number of items to return",
+                "type": {"kind": "SCALAR", "name": "Int", "ofType": None},
+                "defaultValue": None,
+            },
+            {
+                "name": "offset",
+                "description": "Number of items to skip",
+                "type": {"kind": "SCALAR", "name": "Int", "ofType": None},
+                "defaultValue": "0",
+            },
+        ]
+
+    def _build_pagination_types(self) -> list[dict]:
+        """Build introspection data for Pagination and Result types."""
+        types_list: list[dict] = []
+
+        # Pagination type
+        types_list.append({
+            "kind": "OBJECT",
+            "name": "Pagination",
+            "description": "Pagination information for list results",
+            "fields": [
+                {
+                    "name": "has_more",
+                    "description": None,
+                    "args": [],
+                    "type": {
+                        "kind": "NON_NULL",
+                        "name": None,
+                        "ofType": {"kind": "SCALAR", "name": "Boolean", "ofType": None},
+                    },
+                    "isDeprecated": False,
+                    "deprecationReason": None,
+                },
+                {
+                    "name": "total_count",
+                    "description": None,
+                    "args": [],
+                    "type": {"kind": "SCALAR", "name": "Int", "ofType": None},
+                    "isDeprecated": False,
+                    "deprecationReason": None,
+                },
+            ],
+            "inputFields": None,
+            "interfaces": [],
+            "enumValues": None,
+            "possibleTypes": None,
+        })
+
+        # Result types for paginated relationships
+        result_type_names: set[str] = set()
+        for entity in self.entities:
+            rels = self._loader_registry.get_relationships(entity)
+            for rel_name, rel_info in rels.items():
+                if rel_info.is_list and rel_info.page_loader is not None:
+                    target_name = rel_info.target_entity.__name__
+                    result_type_name = f"{target_name}Result"
+                    if result_type_name not in result_type_names:
+                        result_type_names.add(result_type_name)
+                        types_list.append({
+                            "kind": "OBJECT",
+                            "name": result_type_name,
+                            "description": f"Paginated result for {target_name}",
+                            "fields": [
+                                {
+                                    "name": "items",
+                                    "description": None,
+                                    "args": [],
+                                    "type": {
+                                        "kind": "NON_NULL",
+                                        "name": None,
+                                        "ofType": {
+                                            "kind": "LIST",
+                                            "name": None,
+                                            "ofType": {
+                                                "kind": "NON_NULL",
+                                                "name": None,
+                                                "ofType": {
+                                                    "kind": "OBJECT",
+                                                    "name": target_name,
+                                                    "ofType": None,
+                                                },
+                                            },
+                                        },
+                                    },
+                                    "isDeprecated": False,
+                                    "deprecationReason": None,
+                                },
+                                {
+                                    "name": "pagination",
+                                    "description": None,
+                                    "args": [],
+                                    "type": {
+                                        "kind": "NON_NULL",
+                                        "name": None,
+                                        "ofType": {
+                                            "kind": "OBJECT",
+                                            "name": "Pagination",
+                                            "ofType": None,
+                                        },
+                                    },
+                                    "isDeprecated": False,
+                                    "deprecationReason": None,
+                                },
+                            ],
+                            "inputFields": None,
+                            "interfaces": [],
+                            "enumValues": None,
+                            "possibleTypes": None,
+                        })
+
+        return types_list

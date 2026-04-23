@@ -2,74 +2,82 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+import logging
+from collections.abc import Callable
+from typing import Any
 
 from sqlmodel_graphql.discovery import EntityDiscovery
+from sqlmodel_graphql.execution.query_executor import QueryExecutor
 from sqlmodel_graphql.graphiql import GRAPHIQL_HTML
 from sqlmodel_graphql.introspection import IntrospectionGenerator
+from sqlmodel_graphql.loader.registry import LoaderRegistry
 from sqlmodel_graphql.query_parser import QueryParser
-from sqlmodel_graphql.scanning import MethodScanner
 from sqlmodel_graphql.sdl_generator import SDLGenerator
+from sqlmodel_graphql.standard_queries import AutoQueryConfig, add_standard_queries
 
-if TYPE_CHECKING:
-    from sqlmodel import SQLModel
+logger = logging.getLogger(__name__)
 
 
 class GraphQLHandler:
     """Handles GraphQL query execution for SQLModel entities.
 
-    This class scans entities for @query and @mutation decorators,
-    builds a GraphQL schema, and executes queries against it.
+    Uses DataLoader for relationship resolution instead of SQLAlchemy eager loading.
 
     Example:
         ```python
-        from sqlmodel import SQLModel
-        from sqlmodel_graphql import GraphQLHandler, query
-
-        # Define a base class for your entities
-        class BaseEntity(SQLModel):
-            pass
-
-        class User(BaseEntity, table=True):
-            id: int
-            name: str
-
-            @query(name='users')
-            async def get_all(cls) -> list['User']:
-                return await fetch_users()
-
-        # Create handler with base class - auto-discovers all entities
-        handler = GraphQLHandler(base=BaseEntity)
-        result = await handler.execute('{ users { id name } }')
+        handler = GraphQLHandler(
+            base=BaseEntity,
+            session_factory=async_session,
+            enable_pagination=True,
+        )
+        result = await handler.execute('{ users { id name posts { items { title } } } }')
         ```
     """
 
     def __init__(
         self,
-        base: type[SQLModel],
+        base: type,
+        session_factory: Callable | None = None,
         query_description: str | None = None,
         mutation_description: str | None = None,
-        auto_query_config: Any | None = None,
+        auto_query_config: AutoQueryConfig | None = None,
+        enable_pagination: bool = False,
     ):
         """Initialize the GraphQL handler.
 
         Args:
             base: SQLModel base class. All subclasses with @query/@mutation
                   decorators will be automatically discovered.
+            session_factory: Async session factory for DataLoader queries.
+                Required when entities have relationships.
+                If auto_query_config is provided, its session_factory is used as fallback.
             query_description: Optional custom description for Query type.
             mutation_description: Optional custom description for Mutation type.
             auto_query_config: Optional AutoQueryConfig for auto-generating
                                standard queries (by_id, by_filter).
+            enable_pagination: When True, list relationships return Result types
+                with { items, pagination } wrapping.
         """
+        if auto_query_config and not session_factory:
+            session_factory = auto_query_config.session_factory
+
+        self.session_factory = session_factory
+        self.enable_pagination = enable_pagination
+
         # Discover entities with decorators and their related entities
         discovery = EntityDiscovery(base)
         self.entities = discovery.discover(include_all=auto_query_config is not None)
 
         # Add standard queries if auto_query_config is provided
         if auto_query_config is not None:
-            from sqlmodel_graphql.standard_queries import add_standard_queries
-
             add_standard_queries(self.entities, auto_query_config)
+
+        # Build loader registry for DataLoader-based relationship resolution
+        self._loader_registry = LoaderRegistry(
+            self.entities,
+            session_factory=session_factory,
+            enable_pagination=enable_pagination,
+        )
 
         # Initialize SDL generator
         self._sdl_generator = SDLGenerator(
@@ -78,13 +86,20 @@ class GraphQLHandler:
             mutation_description=mutation_description,
         )
 
-        # Parse queries for field selection optimization
+        # Parse queries for field selection
         self._query_parser = QueryParser()
 
         # Scan for @query and @mutation methods
+        from sqlmodel_graphql.scanning import MethodScanner
+
         self._scanner = MethodScanner()
         self._query_methods, self._mutation_methods = self._scanner.scan(self.entities)
-        self._name_mapping = self._scanner.get_name_mapping()
+
+        # Initialize executor with DataLoader support
+        self._executor = QueryExecutor(
+            loader_registry=self._loader_registry,
+            enable_pagination=enable_pagination,
+        )
 
         # Initialize introspection generator
         self._introspection_generator = IntrospectionGenerator(
@@ -93,6 +108,8 @@ class GraphQLHandler:
             mutation_methods=self._mutation_methods,
             query_description=query_description,
             mutation_description=mutation_description,
+            enable_pagination=enable_pagination,
+            loader_registry=self._loader_registry,
         )
 
     def get_sdl(self) -> str:
@@ -101,7 +118,10 @@ class GraphQLHandler:
         Returns:
             SDL string representing the GraphQL schema.
         """
-        return self._sdl_generator.generate()
+        return self._sdl_generator.generate(
+            enable_pagination=self.enable_pagination,
+            loader_registry=self._loader_registry,
+        )
 
     def get_graphiql_html(self, endpoint: str = "/graphql") -> str:
         """Get the GraphiQL HTML template.
@@ -135,15 +155,22 @@ class GraphQLHandler:
             if self._is_introspection_query(query):
                 return self._execute_introspection(query, variables)
 
-            # Parse the query to get field selection info
-            parsed = self._query_parser.parse(query)
+            # Parse the query to get field selections
+            parsed_selections = self._query_parser.parse(query)
 
-            # Execute regular query
-            return await self._execute_query(
-                query, variables, operation_name, parsed
+            # Execute via DataLoader-based executor
+            return await self._executor.execute_query(
+                query=query,
+                variables=variables,
+                operation_name=operation_name,
+                parsed_selections=parsed_selections,
+                query_methods=self._query_methods,
+                mutation_methods=self._mutation_methods,
+                entities=self.entities,
             )
 
         except Exception as e:
+            logger.exception("GraphQL execution error")
             return {"errors": [{"message": str(e)}]}
 
     def _is_introspection_query(self, query: str) -> bool:
@@ -153,131 +180,5 @@ class GraphQLHandler:
     def _execute_introspection(
         self, query: str, variables: dict[str, Any] | None
     ) -> dict[str, Any]:
-        """Execute an introspection query.
-
-        Args:
-            query: GraphQL introspection query string.
-            variables: Optional variables.
-
-        Returns:
-            Introspection result dictionary.
-        """
+        """Execute an introspection query."""
         return self._introspection_generator.execute(query)
-
-    async def _execute_query(
-        self,
-        query: str,
-        variables: dict[str, Any] | None,
-        operation_name: str | None,
-        parsed_meta: dict[str, Any],
-    ) -> dict[str, Any]:
-        """Execute a regular GraphQL query.
-
-        Args:
-            query: GraphQL query string.
-            variables: Optional variables.
-            operation_name: Optional operation name.
-            parsed_meta: Parsed QueryMeta from the query.
-
-        Returns:
-            Query result dictionary.
-        """
-        import inspect
-
-        from graphql import FieldNode, OperationDefinitionNode, parse
-
-        from sqlmodel_graphql.execution import ArgumentBuilder, FieldTreeBuilder
-        from sqlmodel_graphql.response_builder import serialize_with_model
-
-        document = parse(query)
-        data: dict[str, Any] = {}
-        errors: list[dict[str, Any]] = []
-
-        argument_builder = ArgumentBuilder()
-        field_tree_builder = FieldTreeBuilder()
-
-        for definition in document.definitions:
-            if isinstance(definition, OperationDefinitionNode):
-                op_type = definition.operation.value  # 'query' or 'mutation'
-
-                for selection in definition.selection_set.selections:
-                    if isinstance(selection, FieldNode):
-                        field_name = selection.name.value
-
-                        try:
-                            # Get the method for this field
-                            if op_type == "query":
-                                method_info = self._query_methods.get(field_name)
-                            else:
-                                method_info = self._mutation_methods.get(field_name)
-
-                            if method_info is None:
-                                op_name = op_type.title()
-                                msg = f"Cannot query field '{field_name}' on type '{op_name}'"
-                                errors.append(
-                                    {
-                                        "message": msg,
-                                        "path": [field_name],
-                                    }
-                                )
-                                continue
-
-                            entity, method = method_info
-
-                            # Build arguments
-                            entity_names = {e.__name__ for e in self.entities}
-                            args = argument_builder.build_arguments(
-                                selection, variables, method, entity, entity_names
-                            )
-
-                            # Add query_meta if available and method accepts it
-                            # For queries: pass query_meta if method has the parameter
-                            # For mutations: only pass query_meta if return type is an entity
-                            if field_name in parsed_meta:
-                                func = method.__func__ if hasattr(method, "__func__") else method
-                                sig = inspect.signature(func)
-                                accepts_query_meta = "query_meta" in sig.parameters
-
-                                if op_type == "query":
-                                    if accepts_query_meta:
-                                        args["query_meta"] = parsed_meta[field_name]
-                                elif op_type == "mutation":
-                                    from sqlmodel_graphql.utils.type_utils import (
-                                        get_return_entity_type,
-                                    )
-
-                                    return_entity = get_return_entity_type(
-                                        method, self.entities
-                                    )
-                                    if return_entity is not None and accepts_query_meta:
-                                        args["query_meta"] = parsed_meta[field_name]
-
-                            # Execute the method
-                            result = method(**args)
-                            if inspect.isawaitable(result):
-                                result = await result
-
-                            # Extract requested fields from selection set
-                            requested_fields = field_tree_builder.build_field_tree(
-                                selection
-                            )
-
-                            # Serialize using dynamic Pydantic model (filters FK fields)
-                            data[field_name] = serialize_with_model(
-                                result,
-                                entity=entity,
-                                field_tree=requested_fields,
-                            )
-
-                        except Exception as e:
-                            errors.append(
-                                {"message": str(e), "path": [field_name]}
-                            )
-
-        response: dict[str, Any] = {}
-        if data:
-            response["data"] = data
-        if errors:
-            response["errors"] = errors
-
-        return response

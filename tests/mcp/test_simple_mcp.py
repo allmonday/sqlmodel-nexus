@@ -10,7 +10,6 @@ from sqlmodel import Field, SQLModel
 from sqlmodel_graphql import mutation, query
 from sqlmodel_graphql.mcp import config_simple_mcp_server
 from sqlmodel_graphql.mcp.managers.single_app_manager import SingleAppManager
-from sqlmodel_graphql.types import QueryMeta
 
 # Check if fastmcp module is available
 try:
@@ -50,7 +49,7 @@ class SimpleMCPMockUser(SimpleMCPMockBaseEntity, table=True):
 
     @query
     async def get_users(
-        cls, limit: int = 10, query_meta: QueryMeta | None = None
+        cls, limit: int = 10
     ) -> list[SimpleMCPMockUser]:
         """Get all mock users."""
         # Return mock data
@@ -65,14 +64,14 @@ class SimpleMCPMockUser(SimpleMCPMockBaseEntity, table=True):
 
     @query
     async def get_user(
-        cls, id: int, query_meta: QueryMeta | None = None
+        cls, id: int
     ) -> SimpleMCPMockUser | None:
         """Get a mock user by ID."""
         return SimpleMCPMockUser(id=id, name="Test User", email="test@example.com")
 
     @mutation
     async def create_user(
-        cls, name: str, email: str, query_meta: QueryMeta | None = None
+        cls, name: str, email: str
     ) -> SimpleMCPMockUser:
         """Create a new mock user."""
         return SimpleMCPMockUser(id=99, name=name, email=email)

@@ -36,12 +36,12 @@ class BlogUser(BlogBaseEntity, table=True):
     email: str
 
     @query
-    async def get_blog_users(cls, limit: int = 10, query_meta=None) -> list["BlogUser"]:
+    async def get_blog_users(cls, limit: int = 10) -> list["BlogUser"]:
         """Get blog users."""
         return []
 
     @mutation
-    async def create_blog_user(cls, name: str, email: str, query_meta=None) -> "BlogUser":
+    async def create_blog_user(cls, name: str, email: str) -> "BlogUser":
         """Create a blog user."""
         return BlogUser(name=name, email=email)
 
@@ -61,13 +61,13 @@ class ShopProduct(ShopBaseEntity, table=True):
     description: str = ""
 
     @query
-    async def get_shop_products(cls, limit: int = 10, query_meta=None) -> list["ShopProduct"]:
+    async def get_shop_products(cls, limit: int = 10) -> list["ShopProduct"]:
         """Get shop products."""
         return []
 
     @mutation
     async def create_shop_product(
-        cls, name: str, description: str = "", query_meta=None
+        cls, name: str, description: str = ""
     ) -> "ShopProduct":
         """Create a shop product."""
         return ShopProduct(name=name, description=description)

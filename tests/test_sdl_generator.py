@@ -6,7 +6,7 @@ from typing import Optional
 from pydantic import BaseModel
 from sqlmodel import Field, SQLModel
 
-from sqlmodel_graphql import QueryMeta, SDLGenerator, mutation, query
+from sqlmodel_graphql import SDLGenerator, mutation, query
 from sqlmodel_graphql.sdl_generator import _python_type_to_graphql
 from sqlmodel_graphql.type_converter import TypeConverter
 from sqlmodel_graphql.utils.schema_helpers import get_core_types, is_input_type
@@ -22,7 +22,7 @@ class UserForTest(SQLModel):
 
     @query
     async def get_all(
-        cls, limit: int = 10, query_meta: QueryMeta | None = None
+        cls, limit: int = 10
     ) -> list["UserForTest"]:
         """Get all users with optional query optimization."""
         return [
@@ -32,7 +32,7 @@ class UserForTest(SQLModel):
 
     @query
     async def get_by_id(
-        cls, id: int, query_meta: QueryMeta | None = None
+        cls, id: int
     ) -> Optional["UserForTest"]:
         """Get user by ID."""
         users = {
@@ -43,7 +43,7 @@ class UserForTest(SQLModel):
 
     @mutation
     async def create(
-        cls, name: str, email: str, query_meta: QueryMeta | None = None
+        cls, name: str, email: str
     ) -> "UserForTest":
         """Create a new user."""
         return UserForTest(id=3, name=name, email=email)
@@ -353,7 +353,7 @@ class TestSDLGeneratorInputTypes:
 
             @mutation
             def create_with_input(
-                cls, input_data: InputModel, query_meta: QueryMeta | None = None
+                cls, input_data: InputModel
             ) -> "EntityWithInput":
                 """Create entity with input."""
                 return EntityWithInput(id=1)
@@ -379,7 +379,7 @@ class TestSDLGeneratorInputTypes:
 
             @mutation
             def create_nested(
-                cls, data: OuterInput, query_meta: QueryMeta | None = None
+                cls, data: OuterInput
             ) -> "EntityWithNestedInput":
                 """Create entity with nested input."""
                 return EntityWithNestedInput(id=1)
@@ -434,7 +434,7 @@ class TestSDLGeneratorOperationSDL:
 
             @query
             def get_all(
-                cls, query_meta: QueryMeta | None = None
+                cls
             ) -> list["ArticleForTest"]:
                 """Get all articles."""
                 return []

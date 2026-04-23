@@ -3,6 +3,18 @@ revision = 3
 requires-python = ">=3.10"
 
 [[package]]
+name = "aiodataloader"
+version = "0.4.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1a/83/1f86948638cb076969526c944b3d5f6aa1997d140dc3cff1011a821245d3/aiodataloader-0.4.3.tar.gz", hash = "sha256:b8c07ed7fddfdccc2d6298c247b1e5fe9779e5b1c38f2e6ec541a041683ef7e8", size = 14025, upload-time = "2025-11-29T10:14:10.918Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c6/29/80a0a91bd35b46bf31dc53a620780ee7c5b48b4dab7e60fdc4979641846a/aiodataloader-0.4.3-py3-none-any.whl", hash = "sha256:f2d57675e4c7a5cf7efc4c42697d307b951e1a9f40c22df3531a4b9cb7758229", size = 11029, upload-time = "2025-11-29T10:14:09.417Z" },
+]
+
+[[package]]
 name = "aiofile"
 version = "3.9.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1594,6 +1606,7 @@ name = "sqlmodel-graphql"
 version = "0.13.0"
 source = { editable = "." }
 dependencies = [
+    { name = "aiodataloader" },
     { name = "fastapi" },
     { name = "graphql-core" },
     { name = "greenlet" },
@@ -1631,6 +1644,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiodataloader", specifier = ">=0.4.3" },
     { name = "aiosqlite", marker = "extra == 'demo'", specifier = ">=0.19.0" },
     { name = "aiosqlite", marker = "extra == 'dev'", specifier = ">=0.19.0" },
     { name = "fastapi", specifier = ">=0.135.1" },

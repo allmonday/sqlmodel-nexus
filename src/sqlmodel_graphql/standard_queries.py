@@ -1,7 +1,8 @@
 """Standard query generators for SQLModel entities.
 
 This module provides automatic generation of standard queries (by_id, by_filter)
-for SQLModel entities.
+for SQLModel entities. Queries only load scalar fields; relationships are
+resolved separately via DataLoader.
 """
 
 from __future__ import annotations
@@ -14,7 +15,6 @@ from pydantic import Field, create_model
 from sqlmodel import SQLModel, select
 
 from sqlmodel_graphql.decorator import query
-from sqlmodel_graphql.types import QueryMeta
 
 
 class AutoQueryConfig:
@@ -67,35 +67,29 @@ def _get_primary_key_fields(entity: type[SQLModel]) -> list[tuple[str, Any]]:
     primary_keys: list[tuple[str, Any]] = []
 
     for field_name, field_info in entity.model_fields.items():
-        # First check: is it 'id'?
-        if field_name == 'id':
+        if field_name == "id":
             primary_keys.append((field_name, _unwrap_optional_type(field_info.annotation)))
             continue
 
-        # Second check: see if it has primary_key=True
         has_primary_key = False
         has_foreign_key = False
 
-        # Try various ways to detect primary key
-        if hasattr(field_info, 'primary_key'):
+        if hasattr(field_info, "primary_key"):
             if field_info.primary_key is True:
                 has_primary_key = True
 
-        # Also check metadata (FieldInfoMetadata)
-        if not has_primary_key and hasattr(field_info, 'metadata'):
+        if not has_primary_key and hasattr(field_info, "metadata"):
             for meta in field_info.metadata:
-                if hasattr(meta, 'primary_key') and meta.primary_key is True:
+                if hasattr(meta, "primary_key") and meta.primary_key is True:
                     has_primary_key = True
                     break
 
-        # Check for foreign key - only actual string values count
-        if hasattr(field_info, 'foreign_key') and isinstance(field_info.foreign_key, str):
+        if hasattr(field_info, "foreign_key") and isinstance(field_info.foreign_key, str):
             has_foreign_key = True
 
-        # Also check metadata for foreign key
-        if not has_foreign_key and hasattr(field_info, 'metadata'):
+        if not has_foreign_key and hasattr(field_info, "metadata"):
             for meta in field_info.metadata:
-                if hasattr(meta, 'foreign_key') and isinstance(meta.foreign_key, str):
+                if hasattr(meta, "foreign_key") and isinstance(meta.foreign_key, str):
                     has_foreign_key = True
                     break
 
@@ -120,8 +114,8 @@ def _create_filter_input_type(entity: type[SQLModel]) -> type:
     return create_model(f"{entity.__name__}FilterInput", **field_definitions)
 
 
-def _create_by_id_query(entity: type[SQLModel], session_factory) -> Any:
-    """Create by_id query method."""
+def _create_by_id_query(entity: type[SQLModel], session_factory: Any) -> Any:
+    """Create by_id query method (no query_meta, DataLoader handles relationships)."""
 
     primary_keys = _get_primary_key_fields(entity)
     if len(primary_keys) != 1:
@@ -130,11 +124,7 @@ def _create_by_id_query(entity: type[SQLModel], session_factory) -> Any:
     primary_key_name, primary_key_type = primary_keys[0]
 
     @query
-    async def by_id(
-        cls,
-        query_meta: QueryMeta | None = None,
-        **kwargs: Any,
-    ) -> Any:
+    async def by_id(cls, **kwargs: Any) -> Any:
         """Get entity by ID."""
         if primary_key_name not in kwargs:
             msg = f"Missing required primary key argument: {primary_key_name}"
@@ -145,8 +135,6 @@ def _create_by_id_query(entity: type[SQLModel], session_factory) -> Any:
             stmt = select(cls).where(
                 getattr(cls, primary_key_name) == kwargs[primary_key_name]
             )
-            if query_meta:
-                stmt = stmt.options(*query_meta.to_options(cls))
             result = await session.exec(stmt)
             return result.first()
 
@@ -164,12 +152,6 @@ def _create_by_id_query(entity: type[SQLModel], session_factory) -> Any:
                 inspect.Parameter.POSITIONAL_OR_KEYWORD,
                 annotation=primary_key_type,
             ),
-            inspect.Parameter(
-                "query_meta",
-                inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                default=None,
-                annotation=QueryMeta | None,
-            ),
         ],
         return_annotation=entity | None,
     )
@@ -179,18 +161,17 @@ def _create_by_id_query(entity: type[SQLModel], session_factory) -> Any:
 
 def _create_by_filter_query(
     entity: type[SQLModel],
-    session_factory,
+    session_factory: Any,
     default_limit: int,
-    filter_input_type,
+    filter_input_type: type,
 ) -> Any:
-    """Create by_filter query method."""
+    """Create by_filter query method (no query_meta)."""
 
     @query
     async def by_filter(
         cls,
         filter: Any | None = None,
         limit: int = default_limit,
-        query_meta: QueryMeta | None = None,
     ) -> Any:
         """Get entities by filter."""
         session_context = await _create_session_context(session_factory)
@@ -216,8 +197,6 @@ def _create_by_filter_query(
                     if value is not None:
                         stmt = stmt.where(getattr(cls, field_name) == value)
             stmt = stmt.limit(limit)
-            if query_meta:
-                stmt = stmt.options(*query_meta.to_options(cls))
             result = await session.exec(stmt)
             return list(result.all())
 
@@ -240,13 +219,11 @@ def add_standard_queries(entities: list[type[SQLModel]], config: AutoQueryConfig
         return
 
     for entity in entities:
-        # Add by_id query if not exists
         if config.generate_by_id and not hasattr(entity, "by_id"):
             by_id_method = _create_by_id_query(entity, config.session_factory)
             if by_id_method is not None:
                 entity.by_id = by_id_method
 
-        # Add by_filter query if not exists
         if config.generate_by_filter and not hasattr(entity, "by_filter"):
             filter_input_type = _create_filter_input_type(entity)
             by_filter_method = _create_by_filter_query(

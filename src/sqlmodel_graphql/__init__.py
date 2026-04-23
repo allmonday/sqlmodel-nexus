@@ -1,44 +1,44 @@
-"""SQLModel GraphQL - GraphQL SDL generation and query optimization for SQLModel.
+"""SQLModel GraphQL - GraphQL SDL generation and DataLoader-based query execution.
 
 This package provides:
 - Automatic GraphQL SDL generation from SQLModel classes
 - @query/@mutation decorators for defining GraphQL operations
-- QueryMeta extraction from GraphQL queries for query optimization
-- SQLAlchemy query optimization via to_options()
+- DataLoader-based relationship resolution (replaces QueryMeta)
+- Per-relationship pagination support
 
 Example:
     ```python
     from sqlmodel import SQLModel, Field, Relationship, select
-    from sqlmodel_graphql import query, mutation, SDLGenerator, QueryParser
+    from sqlmodel_graphql import query, mutation, GraphQLHandler
 
     class User(SQLModel, table=True):
         id: int = Field(primary_key=True)
         name: str
-        posts: list["Post"] = Relationship(back_populates="author")
+        posts: list["Post"] = Relationship(back_populates="author", order_by="id")
 
-        @query(name='users')
-        async def get_all(cls, query_meta: QueryMeta = None) -> list['User']:
-            stmt = select(cls)
-            if query_meta:
-                stmt = stmt.options(*query_meta.to_options(cls))
-            return await fetch_users(stmt)
+        @query
+        async def get_users(cls, limit: int = 10) -> list['User']:
+            stmt = select(cls).limit(limit)
+            result = await session.exec(stmt)
+            return list(result.all())
 
-    # Generate SDL
-    generator = SDLGenerator([User, Post])
-    print(generator.generate())
+    handler = GraphQLHandler(
+        base=User,
+        session_factory=async_session,
+        enable_pagination=True,
+    )
     ```
 """
 
 from __future__ import annotations
 
-__version__ = "0.11.0"
+__version__ = "0.14.0"
 
 from sqlmodel_graphql.decorator import mutation, query
 from sqlmodel_graphql.handler import GraphQLHandler
-from sqlmodel_graphql.query_parser import QueryParser
+from sqlmodel_graphql.query_parser import FieldSelection, QueryParser
 from sqlmodel_graphql.sdl_generator import SDLGenerator
 from sqlmodel_graphql.standard_queries import AutoQueryConfig, add_standard_queries
-from sqlmodel_graphql.types import FieldSelection, QueryMeta, RelationshipSelection
 
 __all__ = [
     # Version
@@ -51,9 +51,7 @@ __all__ = [
     "QueryParser",
     "GraphQLHandler",
     # Types
-    "QueryMeta",
     "FieldSelection",
-    "RelationshipSelection",
     # Standard queries
     "AutoQueryConfig",
     "add_standard_queries",

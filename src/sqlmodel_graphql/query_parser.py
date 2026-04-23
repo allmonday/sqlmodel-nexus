@@ -1,17 +1,32 @@
-"""GraphQL query parser for extracting QueryMeta from selection sets."""
-
+"""GraphQL query parser for extracting selection trees and arguments."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any
 
 from graphql import FieldNode, OperationDefinitionNode, parse
 
-from sqlmodel_graphql.types import FieldSelection, QueryMeta, RelationshipSelection
+
+@dataclass
+class FieldSelection:
+    """Represents a selected field with its nested selections and arguments.
+
+    Attributes:
+        name: The field name as defined in the SQLModel.
+        alias: Optional GraphQL alias for the field.
+        arguments: Dict of argument name -> value from GraphQL query.
+        sub_fields: Dict of child field name -> FieldSelection for nested selections.
+    """
+
+    name: str = ""
+    alias: str | None = None
+    arguments: dict[str, Any] = field(default_factory=dict)
+    sub_fields: dict[str, FieldSelection] = field(default_factory=dict)
 
 
 class QueryParser:
-    """Parses GraphQL queries to extract QueryMeta for query optimization."""
+    """Parses GraphQL queries to extract field selections and arguments."""
 
     def __init__(self, entity_field_names: set[str] | None = None):
         """Initialize the parser.
@@ -22,17 +37,17 @@ class QueryParser:
         """
         self.entity_field_names = entity_field_names or set()
 
-    def parse(self, query: str) -> dict[str, QueryMeta]:
-        """Parse a GraphQL query and return QueryMeta for each operation.
+    def parse(self, query: str) -> dict[str, FieldSelection]:
+        """Parse a GraphQL query and return FieldSelection for each operation.
 
         Args:
             query: GraphQL query string.
 
         Returns:
-            Dictionary mapping operation name to QueryMeta.
+            Dictionary mapping operation name to FieldSelection.
         """
         document = parse(query)
-        result: dict[str, QueryMeta] = {}
+        result: dict[str, FieldSelection] = {}
 
         for definition in document.definitions:
             if isinstance(definition, OperationDefinitionNode):
@@ -45,38 +60,72 @@ class QueryParser:
 
         return result
 
-    def parse_selection_set(self, selection_set: Any) -> QueryMeta:
-        """Parse a GraphQL selection set into QueryMeta.
-
-        Args:
-            selection_set: GraphQL selection set node.
-
-        Returns:
-            QueryMeta containing field and relationship selections.
-        """
-        return self._parse_selection_set(selection_set)
-
-    def _parse_selection_set(self, selection_set: Any) -> QueryMeta:
-        """Internal method to parse selection set."""
-        fields: list[FieldSelection] = []
-        relationships: dict[str, RelationshipSelection] = {}
+    def _parse_selection_set(self, selection_set: Any) -> FieldSelection:
+        """Internal method to parse selection set into FieldSelection."""
+        sub_fields: dict[str, FieldSelection] = {}
 
         for selection in selection_set.selections:
             if isinstance(selection, FieldNode):
                 field_name = selection.name.value
                 alias = selection.alias.value if selection.alias else None
+                arguments = self._extract_arguments(selection)
 
-                # Check if this is a relationship (has nested selection_set)
                 if selection.selection_set:
-                    # It's a relationship - recursively parse
-                    nested_meta = self._parse_selection_set(selection.selection_set)
-                    relationships[field_name] = RelationshipSelection(
-                        name=field_name,
-                        fields=nested_meta.fields,
-                        relationships=nested_meta.relationships,
-                    )
+                    nested = self._parse_selection_set(selection.selection_set)
+                    nested.name = field_name
+                    nested.alias = alias
+                    nested.arguments = arguments
+                    sub_fields[field_name] = nested
                 else:
-                    # It's a scalar field
-                    fields.append(FieldSelection(name=field_name, alias=alias))
+                    sub_fields[field_name] = FieldSelection(
+                        name=field_name,
+                        alias=alias,
+                        arguments=arguments,
+                    )
 
-        return QueryMeta(fields=fields, relationships=relationships)
+        return FieldSelection(sub_fields=sub_fields)
+
+    def _extract_arguments(self, field_node: FieldNode) -> dict[str, Any]:
+        """Extract arguments from a FieldNode into a dict."""
+        args: dict[str, Any] = {}
+        if not field_node.arguments:
+            return args
+
+        for arg in field_node.arguments:
+            args[arg.name.value] = self._value_node_to_python(arg.value)
+
+        return args
+
+    def _value_node_to_python(self, value_node: Any) -> Any:
+        """Convert a GraphQL ValueNode to a Python value."""
+        from graphql import (
+            BooleanValueNode,
+            EnumValueNode,
+            FloatValueNode,
+            IntValueNode,
+            ListValueNode,
+            NullValueNode,
+            ObjectValueNode,
+            StringValueNode,
+        )
+
+        if isinstance(value_node, IntValueNode):
+            return int(value_node.value)
+        elif isinstance(value_node, FloatValueNode):
+            return float(value_node.value)
+        elif isinstance(value_node, StringValueNode):
+            return value_node.value
+        elif isinstance(value_node, BooleanValueNode):
+            return value_node.value
+        elif isinstance(value_node, NullValueNode):
+            return None
+        elif isinstance(value_node, EnumValueNode):
+            return value_node.value
+        elif isinstance(value_node, ListValueNode):
+            return [self._value_node_to_python(v) for v in value_node.values]
+        elif isinstance(value_node, ObjectValueNode):
+            return {
+                f.name.value: self._value_node_to_python(f.value)
+                for f in value_node.fields
+            }
+        return str(value_node.value) if hasattr(value_node, "value") else None

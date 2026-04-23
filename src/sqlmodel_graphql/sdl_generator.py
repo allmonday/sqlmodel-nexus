@@ -98,12 +98,23 @@ class SDLGenerator:
         self._query_description = query_description
         self._mutation_description = mutation_description
 
-    def generate(self, include_mutations: bool = True) -> str:
+    def generate(
+        self,
+        include_mutations: bool = True,
+        enable_pagination: bool = False,
+        loader_registry: Any | None = None,
+    ) -> str:
         """Generate complete GraphQL SDL string.
 
         Args:
             include_mutations: If True, includes Mutation type in SDL. Default is True.
+            enable_pagination: If True, list relationship fields become Result types.
+            loader_registry: LoaderRegistry for relationship introspection (required
+                when enable_pagination is True).
         """
+        self._enable_pagination = enable_pagination
+        self._loader_registry = loader_registry
+
         parts = []
 
         # 1. Generate enum types
@@ -119,7 +130,13 @@ class SDLGenerator:
         for entity in self.entities:
             parts.append(self._generate_type(entity))
 
-        # 4. Generate Query type
+        # 4. Generate Pagination and Result types (if pagination enabled)
+        if enable_pagination:
+            pag_types = self._generate_pagination_types()
+            if pag_types:
+                parts.append(pag_types)
+
+        # 5. Generate Query type
         query_fields = self._collect_query_fields()
         if query_fields:
             query_def = f"type Query {{\n{chr(10).join(query_fields)}\n}}"
@@ -127,7 +144,7 @@ class SDLGenerator:
                 query_def = f'"""{self._query_description}"""\n{query_def}'
             parts.append(query_def)
 
-        # 5. Generate Mutation type (conditional)
+        # 6. Generate Mutation type (conditional)
         if include_mutations:
             mutation_fields = self._collect_mutation_fields()
             if mutation_fields:
@@ -306,6 +323,9 @@ class SDLGenerator:
 
         # Get scalar fields from model_fields
         for field_name, field_info in entity.model_fields.items():
+            # Skip FK fields from output
+            if self._is_fk_field(field_info):
+                continue
             gql_type = self._field_info_to_graphql(field_info)
             # Add field description if available
             if field_info.description:
@@ -319,7 +339,7 @@ class SDLGenerator:
                 continue  # Already processed
 
             # Check if it's a relationship (references another entity)
-            gql_type = self._type_hint_to_graphql(hint)
+            gql_type = self._type_hint_to_graphql(hint, entity, field_name)
             if gql_type:
                 fields.append(f"  {field_name}: {gql_type}")
 
@@ -329,12 +349,19 @@ class SDLGenerator:
             type_def = f'"""{entity.__doc__}"""\n{type_def}'
         return type_def
 
-    def _field_info_to_graphql(self, field_info: Any) -> str:
-        """Convert Pydantic FieldInfo to GraphQL type."""
-        annotation = field_info.annotation
-        return _python_type_to_graphql(annotation, self._converter)
+    def _is_fk_field(self, field_info: Any) -> bool:
+        """Check if a field is a foreign key field (should be excluded from GraphQL output)."""
+        if hasattr(field_info, "foreign_key") and isinstance(field_info.foreign_key, str):
+            return True
+        if hasattr(field_info, "metadata"):
+            for meta in field_info.metadata:
+                if hasattr(meta, "foreign_key") and isinstance(meta.foreign_key, str):
+                    return True
+        return False
 
-    def _type_hint_to_graphql(self, hint: Any) -> str | None:
+    def _type_hint_to_graphql(
+        self, hint: Any, entity: type[SQLModel] | None = None, field_name: str | None = None
+    ) -> str | None:
         """Convert type hint to GraphQL type if it's an entity reference."""
         # Unwrap Mapped wrapper if present
         if self._converter.is_mapped_wrapper(hint):
@@ -347,6 +374,14 @@ class SDLGenerator:
             inner = self._converter.get_list_inner_type(hint)
             entity_name = self._converter.get_entity_name(inner)
             if entity_name:
+                # Check if pagination is enabled for this relationship
+                if (
+                    self._enable_pagination
+                    and entity
+                    and field_name
+                    and self._is_paginated_relationship(entity, field_name)
+                ):
+                    return f"{entity_name}Result!"
                 return f"[{entity_name}!]!"
             return None
 
@@ -364,6 +399,54 @@ class SDLGenerator:
             return f"{entity_name}!"
 
         return None
+
+    def _is_paginated_relationship(
+        self, entity: type[SQLModel], field_name: str
+    ) -> bool:
+        """Check if a relationship has pagination enabled (page_loader configured)."""
+        if not self._loader_registry:
+            return False
+        rel_info = self._loader_registry.get_relationship(entity, field_name)
+        return rel_info is not None and rel_info.page_loader is not None
+
+    def _generate_pagination_types(self) -> str | None:
+        """Generate Pagination type and Result types for paginated relationships."""
+        if not self._loader_registry:
+            return None
+
+        result_type_names: set[str] = set()
+        parts: list[str] = []
+
+        # Pagination base type
+        parts.append(
+            "type Pagination {\n"
+            "  has_more: Boolean!\n"
+            "  total_count: Int\n"
+            "}"
+        )
+
+        # Generate Result types for each paginated relationship
+        for entity in self.entities:
+            rels = self._loader_registry.get_relationships(entity)
+            for rel_name, rel_info in rels.items():
+                if rel_info.is_list and rel_info.page_loader is not None:
+                    target_name = rel_info.target_entity.__name__
+                    result_type_name = f"{target_name}Result"
+                    if result_type_name not in result_type_names:
+                        result_type_names.add(result_type_name)
+                        parts.append(
+                            f"type {result_type_name} {{\n"
+                            f"  items: [{target_name}!]!\n"
+                            f"  pagination: Pagination!\n"
+                            f"}}",
+                        )
+
+        return "\n\n".join(parts) if parts else None
+
+    def _field_info_to_graphql(self, field_info: Any) -> str:
+        """Convert Pydantic FieldInfo to GraphQL type."""
+        annotation = field_info.annotation
+        return _python_type_to_graphql(annotation, self._converter)
 
     def _collect_query_fields(self) -> list[str]:
         """Collect @query methods from all entities."""
