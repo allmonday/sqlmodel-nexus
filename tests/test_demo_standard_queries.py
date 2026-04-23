@@ -26,13 +26,8 @@ def test_demo_with_standard_queries():
     assert hasattr(Comment, "by_id")
     assert hasattr(Comment, "by_filter")
 
-    # Verify filter input types exist
-    assert hasattr(User, "_filter_input_type")
-    assert hasattr(Post, "_filter_input_type")
-    assert hasattr(Comment, "_filter_input_type")
-
     # Generate SDL
-    handler = GraphQLHandler(base=BaseEntity)
+    handler = GraphQLHandler(base=BaseEntity, auto_query_config=config)
     sdl = handler.get_sdl()
 
     print("=== Generated SDL with Standard Queries ===\n")

@@ -9,7 +9,7 @@ config = AutoQueryConfig(
     default_limit=20,
 )
 
-handler = GraphQLHandler(base=BaseEntity, auto_query_config=config)
+handler = GraphQLHandler(base=BaseEntity, session_factory=async_session, auto_query_config=config)
 
 sdl = handler.get_sdl()
 
