@@ -1,4 +1,4 @@
-"""SQLModel GraphQL - GraphQL SDL generation and DataLoader-based query execution.
+"""SQLModel GraphQL - GraphQL SDL generation and Core API response building.
 
 This package provides:
 - Automatic GraphQL SDL generation from SQLModel classes
@@ -58,6 +58,7 @@ from sqlmodel_graphql.context import AutoLoad, Collector, ExposeAs, SendTo
 from sqlmodel_graphql.decorator import mutation, query
 from sqlmodel_graphql.er_diagram import ErDiagram
 from sqlmodel_graphql.handler import GraphQLHandler
+from sqlmodel_graphql.loader import LoaderRegistry
 from sqlmodel_graphql.query_parser import FieldSelection, QueryParser
 from sqlmodel_graphql.relationship import Relationship
 from sqlmodel_graphql.resolver import Loader, Resolver
@@ -75,6 +76,7 @@ __all__ = [
     "SDLGenerator",
     "QueryParser",
     "GraphQLHandler",
+    "LoaderRegistry",
     # Types
     "FieldSelection",
     # Standard queries

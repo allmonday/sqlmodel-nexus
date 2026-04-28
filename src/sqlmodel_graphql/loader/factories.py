@@ -88,14 +88,14 @@ def create_many_to_one_loader(
 
     class _Loader(DataLoader):
         async def batch_load_fn(self, keys):
-            from sqlalchemy import select
+            from sqlmodel import select
 
             async with self.session_factory() as session:
                 stmt = select(self.target_kls).where(
                     getattr(self.target_kls, self.target_remote_col_name).in_(keys)
                 )
                 stmt = _apply_filters(stmt, self.filters)
-                rows = (await session.scalars(stmt)).all()
+                rows = (await session.exec(stmt)).all()
 
             lookup = {getattr(row, self.target_remote_col_name): row for row in rows}
             return [lookup.get(k) for k in keys]
@@ -132,14 +132,14 @@ def create_one_to_many_loader(
 
     class _Loader(DataLoader):
         async def batch_load_fn(self, keys):
-            from sqlalchemy import select
+            from sqlmodel import select
 
             async with self.session_factory() as session:
                 stmt = select(self.target_kls).where(
                     getattr(self.target_kls, self.target_fk_col_name).in_(keys)
                 )
                 stmt = _apply_filters(stmt, self.filters)
-                rows = (await session.scalars(stmt)).all()
+                rows = (await session.exec(stmt)).all()
 
             grouped = defaultdict(list)
             for row in rows:
@@ -179,13 +179,13 @@ def create_many_to_many_loader(
 
     class _Loader(DataLoader):
         async def batch_load_fn(self, keys):
-            from sqlalchemy import select
+            from sqlmodel import select
 
             async with self.session_factory() as session:
                 join_stmt = select(self.secondary_table).where(
                     getattr(self.secondary_table.c, self.secondary_local_col_name).in_(keys)
                 )
-                join_rows = (await session.execute(join_stmt)).all()
+                join_rows = (await session.exec(join_stmt)).all()
 
                 target_keys = list(
                     {_row_get(row, self.secondary_remote_col_name) for row in join_rows}
@@ -197,7 +197,7 @@ def create_many_to_many_loader(
                     getattr(self.target_kls, self.target_match_col_name).in_(target_keys)
                 )
                 target_stmt = _apply_filters(target_stmt, self.filters)
-                target_rows = (await session.scalars(target_stmt)).all()
+                target_rows = (await session.exec(target_stmt)).all()
 
             target_map = {
                 getattr(row, self.target_match_col_name): row for row in target_rows
@@ -345,7 +345,7 @@ def create_page_one_to_many_loader(
                 outer = select(subq).where(rn_col.between(start, end)).order_by(
                     fk_col_sub, sort_col_sub, pk_col_sub,
                 )
-                rows = (await session.execute(outer)).all()
+                rows = (await session.exec(outer)).all()
 
                 grouped = defaultdict(list)
                 total_counts: dict[Any, int] = {}
@@ -366,7 +366,7 @@ def create_page_one_to_many_loader(
                     )
                     count_q = _apply_filters(count_q, self.filters)
                     count_q = count_q.group_by(fk_col)
-                    for row in (await session.execute(count_q)).all():
+                    for row in (await session.exec(count_q)).all():
                         total_counts[row[0]] = row[1]
 
                 return [
@@ -472,7 +472,7 @@ def create_page_many_to_many_loader(
                 outer = select(subq).where(rn_col.between(start, end)).order_by(
                     sec_local_sub, sort_col_sub, pk_col_sub,
                 )
-                rows = (await session.execute(outer)).all()
+                rows = (await session.exec(outer)).all()
 
                 grouped = defaultdict(list)
                 total_counts: dict[Any, int] = {}
@@ -492,7 +492,7 @@ def create_page_many_to_many_loader(
                     )
                     count_q = _apply_filters(count_q, self.filters)
                     count_q = count_q.group_by(sec_local_col)
-                    for row in (await session.execute(count_q)).all():
+                    for row in (await session.exec(count_q)).all():
                         total_counts[row[0]] = row[1]
 
                 return [

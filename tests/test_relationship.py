@@ -12,7 +12,7 @@ from sqlmodel_graphql import AutoLoad, DefineSubset, ErDiagram, Relationship
 from sqlmodel_graphql.loader.registry import LoaderRegistry, _build_custom_relationship_info
 from sqlmodel_graphql.relationship import get_custom_relationships
 from sqlmodel_graphql.resolver import Resolver
-from tests.conftest import TestSprint, TestTask, TestUser
+from tests.conftest import FixtureSprint, FixtureTask, FixtureUser
 
 # ──────────────────────────────────────────────────────────
 # Test entities with __relationships__
@@ -175,7 +175,7 @@ class TestErDiagramCustomRelationships:
 
     def test_custom_and_orm_relationships_combined(self):
         """Both ORM and custom relationships should appear in the diagram."""
-        # Use TestTask which has ORM relationships (sprint, owner)
+        # Use FixtureTask which has ORM relationships (sprint, owner)
         # plus add a custom relationship via __relationships__
         diagram = ErDiagram.from_sqlmodel([Post, Tag, RelUser])
 
@@ -188,12 +188,12 @@ class TestErDiagramCustomRelationships:
     @pytest.mark.usefixtures("test_db")
     def test_conftest_models_with_custom_rel(self):
         """ER Diagram should work with conftest models that have ORM relationships."""
-        diagram = ErDiagram.from_sqlmodel([TestUser, TestSprint, TestTask])
+        diagram = ErDiagram.from_sqlmodel([FixtureUser, FixtureSprint, FixtureTask])
 
-        task_entity = next(e for e in diagram.entities if e.name == "TestTask")
+        task_entity = next(e for e in diagram.entities if e.name == "FixtureTask")
         rel_names = {r.name for r in task_entity.relationships}
 
-        # ORM relationships on TestTask
+        # ORM relationships on FixtureTask
         assert "sprint" in rel_names
         assert "owner" in rel_names
 
@@ -245,8 +245,8 @@ class TestLoaderRegistryCustomRelationships:
         # DuplicatePost has ORM relationship 'author' (via FK) and
         # custom 'author' in __relationships__ — this should conflict
         # But actually, Post (without explicit ORM Relationship()) won't have
-        # ORM 'author'. So test with conftest TestTask which has ORM 'owner'.
-        # We need a custom rel named 'owner' on TestTask to trigger conflict.
+        # ORM 'author'. So test with conftest FixtureTask which has ORM 'owner'.
+        # We need a custom rel named 'owner' on FixtureTask to trigger conflict.
 
         # Use the DuplicatePost which has duplicate custom names — the second
         # will conflict with the first during registration.
@@ -255,6 +255,102 @@ class TestLoaderRegistryCustomRelationships:
                 entities=[DuplicatePost, RelUser],
                 session_factory=lambda: None,
             )
+
+    async def test_same_relationship_name_is_scoped_by_entity(self):
+        """Resolver should pick the loader for the DTO's source entity."""
+
+        async def tags_for_primary(ids: list[int]) -> list[list[Tag]]:
+            return [[Tag(id=item_id, name=f"primary-{item_id}")] for item_id in ids]
+
+        async def tags_for_secondary(ids: list[int]) -> list[list[Tag]]:
+            return [[Tag(id=item_id, name=f"secondary-{item_id}")] for item_id in ids]
+
+        class PrimaryPost(SQLModel, table=True):
+            __tablename__ = "rel_test_primary_post"
+
+            id: int | None = Field(default=None, primary_key=True)
+            __relationships__ = [
+                Relationship(
+                    fk="id",
+                    target=Tag,
+                    name="tags",
+                    loader=tags_for_primary,
+                    is_list=True,
+                )
+            ]
+
+        class SecondaryPost(SQLModel, table=True):
+            __tablename__ = "rel_test_secondary_post"
+
+            id: int | None = Field(default=None, primary_key=True)
+            __relationships__ = [
+                Relationship(
+                    fk="id",
+                    target=Tag,
+                    name="tags",
+                    loader=tags_for_secondary,
+                    is_list=True,
+                )
+            ]
+
+        registry = LoaderRegistry(
+            entities=[PrimaryPost, SecondaryPost, Tag],
+            session_factory=lambda: None,
+        )
+
+        class TagDTO(DefineSubset):
+            __subset__ = (Tag, ("id", "name"))
+
+        class SecondaryPostDTO(DefineSubset):
+            __subset__ = (SecondaryPost, ("id",))
+            tags: list[TagDTO] = []
+
+        result = await Resolver(registry).resolve(SecondaryPostDTO(id=1))
+
+        assert [tag.name for tag in result.tags] == ["secondary-1"]
+
+    async def test_resolve_clears_shared_registry_cache(self):
+        """Each Resolver.resolve call should start with a fresh registry cache."""
+
+        call_count = 0
+
+        async def versioned_tags(ids: list[int]) -> list[list[Tag]]:
+            nonlocal call_count
+            call_count += 1
+            return [[Tag(id=item_id, name=f"call-{call_count}")] for item_id in ids]
+
+        class CachePost(SQLModel, table=True):
+            __tablename__ = "rel_test_cache_post"
+
+            id: int | None = Field(default=None, primary_key=True)
+            __relationships__ = [
+                Relationship(
+                    fk="id",
+                    target=Tag,
+                    name="tags",
+                    loader=versioned_tags,
+                    is_list=True,
+                )
+            ]
+
+        registry = LoaderRegistry(
+            entities=[CachePost, Tag],
+            session_factory=lambda: None,
+        )
+
+        class TagDTO(DefineSubset):
+            __subset__ = (Tag, ("id", "name"))
+
+        class CachePostDTO(DefineSubset):
+            __subset__ = (CachePost, ("id",))
+            tags: list[TagDTO] = []
+
+        first = await Resolver(registry).resolve(CachePostDTO(id=1))
+        second = await Resolver(registry).resolve(CachePostDTO(id=1))
+
+        assert [tag.name for tag in first.tags] == ["call-1"]
+        assert [tag.name for tag in second.tags] == ["call-2"]
+        assert call_count == 2
 
 
 # ──────────────────────────────────────────────────────────
@@ -269,32 +365,32 @@ class TestAutoLoadCustomRelationship:
 
         async def user_loader(ids: list[int]) -> list:
             return [
-                TestUser(id=1, name="Alice", email="alice@test.com") if k == 1
-                else TestUser(id=2, name="Bob", email="bob@test.com")
+                FixtureUser(id=1, name="Alice", email="alice@test.com") if k == 1
+                else FixtureUser(id=2, name="Bob", email="bob@test.com")
                 for k in ids
             ]
 
         registry = LoaderRegistry(
-            entities=[TestUser, TestSprint, TestTask],
+            entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=lambda: None,
         )
 
         custom_rel = Relationship(
             fk="owner_id",
-            target=TestUser,
+            target=FixtureUser,
             name="custom_owner",
             loader=user_loader,
             is_list=False,
         )
-        registry._registry[TestTask]["custom_owner"] = _build_custom_relationship_info(
+        registry._registry[FixtureTask]["custom_owner"] = _build_custom_relationship_info(
             custom_rel
         )
 
         class UserDTO(DefineSubset):
-            __subset__ = (TestUser, ("id", "name"))
+            __subset__ = (FixtureUser, ("id", "name"))
 
         class TaskDTO(DefineSubset):
-            __subset__ = (TestTask, ("id", "title", "owner_id"))
+            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
             custom_owner: Annotated[UserDTO | None, AutoLoad()] = None
 
         dto = TaskDTO(id=1, title="Test", owner_id=1)
@@ -311,23 +407,23 @@ class TestAutoLoadCustomRelationship:
             return [[f"Greeting for {i}"] for i in ids]
 
         registry = LoaderRegistry(
-            entities=[TestUser, TestSprint, TestTask],
+            entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=lambda: None,
         )
 
         custom_rel = Relationship(
             fk="id",
-            target=TestSprint,
+            target=FixtureSprint,
             name="greetings",
             loader=greeting_loader,
             is_list=True,
         )
-        registry._registry[TestSprint]["greetings"] = _build_custom_relationship_info(
+        registry._registry[FixtureSprint]["greetings"] = _build_custom_relationship_info(
             custom_rel
         )
 
         class SprintDTO(DefineSubset):
-            __subset__ = (TestSprint, ("id", "name"))
+            __subset__ = (FixtureSprint, ("id", "name"))
             greetings: Annotated[list[str], AutoLoad()] = []
 
         dto = SprintDTO(id=1, name="Sprint 1")
@@ -352,23 +448,23 @@ class TestAutoLoadCustomRelationship:
             name: str
 
         registry = LoaderRegistry(
-            entities=[TestUser, TestSprint, TestTask],
+            entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=lambda: None,
         )
 
         custom_rel = Relationship(
             fk="owner_id",
-            target=TestUser,
+            target=FixtureUser,
             name="custom_owner",
             loader=user_loader,
             is_list=False,
         )
-        registry._registry[TestTask]["custom_owner"] = _build_custom_relationship_info(
+        registry._registry[FixtureTask]["custom_owner"] = _build_custom_relationship_info(
             custom_rel
         )
 
         class TaskDTO(DefineSubset):
-            __subset__ = (TestTask, ("id", "title", "owner_id"))
+            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
             custom_owner: Annotated[UserDTO | None, AutoLoad()] = None
 
         dto = TaskDTO(id=1, title="Test", owner_id=1)

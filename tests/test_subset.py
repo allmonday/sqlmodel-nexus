@@ -282,7 +282,7 @@ class TestDefineSubsetNested:
 # ──────────────────────────────────────────────────────────
 
 # Need table=True entities for SQLAlchemy relationship inspection
-from tests.conftest import TestSprint, TestTask, TestUser, get_test_session_factory
+from tests.conftest import FixtureSprint, FixtureTask, FixtureUser, get_test_session_factory
 
 
 class TestSQLModelRelationshipTypeValidation:
@@ -292,8 +292,8 @@ class TestSQLModelRelationshipTypeValidation:
         with pytest.raises(TypeError, match="must use a DTO type"):
 
             class TaskBad(DefineSubset):
-                __subset__ = (TestTask, ("id", "title", "owner_id"))
-                owner: TestUser | None = None  # raw SQLModel → error
+                __subset__ = (FixtureTask, ("id", "title", "owner_id"))
+                owner: FixtureUser | None = None  # raw SQLModel → error
 
     def test_sqlmodel_in_list_raises(self):
         """Using raw SQLModel in list[Entity] should raise TypeError."""
@@ -301,8 +301,8 @@ class TestSQLModelRelationshipTypeValidation:
         with pytest.raises(TypeError, match="must use a DTO type"):
 
             class SprintBad(DefineSubset):
-                __subset__ = (TestSprint, ("id", "name"))
-                tasks: list[TestTask] = []  # raw SQLModel in list → error
+                __subset__ = (FixtureSprint, ("id", "name"))
+                tasks: list[FixtureTask] = []  # raw SQLModel in list → error
 
     def test_sqlmodel_in_annotated_raises(self):
         """Using Annotated[Entity, ...] should raise TypeError."""
@@ -312,17 +312,17 @@ class TestSQLModelRelationshipTypeValidation:
         with pytest.raises(TypeError, match="must use a DTO type"):
 
             class TaskBadAnnotated(DefineSubset):
-                __subset__ = (TestTask, ("id", "title", "owner_id"))
-                owner: Annotated[TestUser | None, SendTo("owners")] = None
+                __subset__ = (FixtureTask, ("id", "title", "owner_id"))
+                owner: Annotated[FixtureUser | None, SendTo("owners")] = None
 
     def test_dto_type_on_relationship_works(self):
         """Using a DefineSubset DTO type for relationship field should work fine."""
 
         class UserDTO(DefineSubset):
-            __subset__ = (TestUser, ("id", "name"))
+            __subset__ = (FixtureUser, ("id", "name"))
 
         class TaskDTO(DefineSubset):
-            __subset__ = (TestTask, ("id", "title", "owner_id"))
+            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
             owner: UserDTO | None = None
 
         assert "owner" in TaskDTO.model_fields
@@ -331,10 +331,10 @@ class TestSQLModelRelationshipTypeValidation:
         """Using list[DTO] for one-to-many relationship should work fine."""
 
         class TaskDTO(DefineSubset):
-            __subset__ = (TestTask, ("id", "title", "owner_id"))
+            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
 
         class SprintDTO(DefineSubset):
-            __subset__ = (TestSprint, ("id", "name"))
+            __subset__ = (FixtureSprint, ("id", "name"))
             tasks: list[TaskDTO] = []
 
         assert "tasks" in SprintDTO.model_fields
@@ -343,10 +343,10 @@ class TestSQLModelRelationshipTypeValidation:
         """Fields that don't match a relationship name should accept any type."""
 
         class TaskDTO(DefineSubset):
-            __subset__ = (TestTask, ("id", "title", "owner_id"))
-            # 'assignee' does NOT match any relationship on TestTask
+            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
+            # 'assignee' does NOT match any relationship on FixtureTask
             # (relationships are 'owner' and 'sprint')
-            assignee: TestUser | None = None
+            assignee: FixtureUser | None = None
 
         # Should not raise — 'assignee' is not a relationship name
         assert "assignee" in TaskDTO.model_fields
@@ -535,7 +535,7 @@ class TestSubsetConfig:
 
         class TaskDTO(DefineSubset):
             __subset__ = SubsetConfig(
-                kls=TestTask,
+                kls=FixtureTask,
                 fields=["id", "title", "owner_id"],
             )
 
@@ -563,7 +563,7 @@ class TestSubsetConfigIntegration:
 
         class ChildDTO(DefineSubset):
             __subset__ = SubsetConfig(
-                kls=TestTask,
+                kls=FixtureTask,
                 fields=["id", "title"],
             )
             parent_name: str = ""
@@ -573,7 +573,7 @@ class TestSubsetConfigIntegration:
 
         class ParentDTO(DefineSubset):
             __subset__ = SubsetConfig(
-                kls=TestSprint,
+                kls=FixtureSprint,
                 fields=["id", "name"],
                 expose_as=[("name", "sprint_name")],
             )
@@ -581,7 +581,7 @@ class TestSubsetConfigIntegration:
 
         session_factory = get_test_session_factory()
         async with session_factory() as session:
-            sprints = (await session.exec(select(TestSprint))).all()
+            sprints = (await session.exec(select(FixtureSprint))).all()
 
         dtos = [ParentDTO(id=s.id, name=s.name) for s in sprints]
         result = await Resolver().resolve(dtos)
@@ -605,23 +605,23 @@ class TestSubsetConfigIntegration:
 
         session_factory = get_test_session_factory()
         registry = LoaderRegistry(
-            entities=[TestUser, TestSprint, TestTask],
+            entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
 
         class UserDTO(DefineSubset):
-            __subset__ = SubsetConfig(kls=TestUser, fields=["id", "name"])
+            __subset__ = SubsetConfig(kls=FixtureUser, fields=["id", "name"])
 
         class TaskDTO(DefineSubset):
             __subset__ = SubsetConfig(
-                kls=TestTask,
+                kls=FixtureTask,
                 fields=["id", "title", "owner_id"],
                 send_to=[("owner", "contributors")],
             )
             owner: UserDTO | None = None
 
         class SprintDTO(DefineSubset):
-            __subset__ = SubsetConfig(kls=TestSprint, fields=["id", "name"])
+            __subset__ = SubsetConfig(kls=FixtureSprint, fields=["id", "name"])
             tasks: list[TaskDTO] = []
             contributors: list[UserDTO] = []
 
@@ -629,7 +629,7 @@ class TestSubsetConfigIntegration:
                 return collector.values()
 
         async with session_factory() as session:
-            sprints = (await session.exec(select(TestSprint))).all()
+            sprints = (await session.exec(select(FixtureSprint))).all()
 
         dtos = [SprintDTO(id=s.id, name=s.name) for s in sprints]
         result = await Resolver(registry).resolve(dtos)
@@ -657,16 +657,16 @@ class TestSubsetConfigIntegration:
 
         session_factory = get_test_session_factory()
         registry = LoaderRegistry(
-            entities=[TestUser, TestSprint, TestTask],
+            entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
 
         class UserDTO(DefineSubset):
-            __subset__ = SubsetConfig(kls=TestUser, fields=["id", "name"])
+            __subset__ = SubsetConfig(kls=FixtureUser, fields=["id", "name"])
 
         class TaskDTO(DefineSubset):
             __subset__ = SubsetConfig(
-                kls=TestTask,
+                kls=FixtureTask,
                 fields=["id", "title", "owner_id"],
                 send_to=[("owner", "contributors")],
             )
@@ -679,7 +679,7 @@ class TestSubsetConfigIntegration:
 
         class SprintDTO(DefineSubset):
             __subset__ = SubsetConfig(
-                kls=TestSprint,
+                kls=FixtureSprint,
                 fields=["id", "name"],
                 expose_as=[("name", "sprint_name")],
             )
@@ -690,7 +690,7 @@ class TestSubsetConfigIntegration:
                 return collector.values()
 
         async with session_factory() as session:
-            sprints = (await session.exec(select(TestSprint))).all()
+            sprints = (await session.exec(select(FixtureSprint))).all()
 
         dtos = [SprintDTO(id=s.id, name=s.name) for s in sprints]
         result = await Resolver(registry).resolve(dtos)
@@ -711,14 +711,14 @@ class TestSubsetConfigIntegration:
 
         class TaskDTO(DefineSubset):
             __subset__ = SubsetConfig(
-                kls=TestTask,
+                kls=FixtureTask,
                 fields=["id", "title", "owner_id"],
                 excluded_fields=["owner_id"],
             )
 
         session_factory = get_test_session_factory()
         async with session_factory() as session:
-            tasks = (await session.exec(select(TestTask))).all()
+            tasks = (await session.exec(select(FixtureTask))).all()
 
         dtos = [TaskDTO.model_validate(t) for t in tasks]
         for dto in dtos:
@@ -741,24 +741,24 @@ class TestSubsetConfigIntegration:
 
         session_factory = get_test_session_factory()
         registry = LoaderRegistry(
-            entities=[TestUser, TestSprint, TestTask],
+            entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
 
         class UserDTO(DefineSubset):
-            __subset__ = SubsetConfig(kls=TestUser, fields="all")
+            __subset__ = SubsetConfig(kls=FixtureUser, fields="all")
 
         # Use explicit fields to avoid relationship fields (sprint, owner)
         # that would cause DetachedInstanceError during model_validate
         class TaskDTO(DefineSubset):
             __subset__ = SubsetConfig(
-                kls=TestTask,
+                kls=FixtureTask,
                 fields=["id", "title", "sprint_id", "owner_id"],
             )
             owner: UserDTO | None = None
 
         async with session_factory() as session:
-            tasks = (await session.exec(select(TestTask))).all()
+            tasks = (await session.exec(select(FixtureTask))).all()
 
         # Build DTOs manually to avoid DetachedInstanceError from relationship attrs
         dtos = [
@@ -787,13 +787,13 @@ class TestSubsetConfigIntegration:
 
         class TaskDTO(DefineSubset):
             __subset__ = SubsetConfig(
-                kls=TestTask,
+                kls=FixtureTask,
                 fields=["id", "title"],
                 send_to=[("title", "all_titles")],
             )
 
         class SprintDTO(DefineSubset):
-            __subset__ = SubsetConfig(kls=TestSprint, fields=["id", "name"])
+            __subset__ = SubsetConfig(kls=FixtureSprint, fields=["id", "name"])
             tasks: list[TaskDTO] = []
             all_titles: list[str] = []
 
@@ -802,7 +802,7 @@ class TestSubsetConfigIntegration:
 
         session_factory = get_test_session_factory()
         async with session_factory() as session:
-            sprints = (await session.exec(select(TestSprint))).all()
+            sprints = (await session.exec(select(FixtureSprint))).all()
 
         dtos = [SprintDTO(id=s.id, name=s.name) for s in sprints]
         result = await Resolver().resolve(dtos)

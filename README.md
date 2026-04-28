@@ -5,20 +5,22 @@
 [![PyPI Downloads](https://static.pepy.tech/badge/sqlmodel-graphql/month)](https://pepy.tech/projects/sqlmodel-graphql)
 ![Python Versions](https://img.shields.io/pypi/pyversion/sqlmodel-graphql)
 
-**From SQLModel to Running GraphQL API + MCP Server in Minutes**
+**From SQLModel to Running GraphQL API, Core API DTOs, and MCP Server in Minutes**
 
 sqlmodel-graphql is the fastest way to build a minimum viable system:
 
 - **Zero Config GraphQL** - SQLModel classes → GraphQL schema automatically
+- **Core API DTO Mode** - DefineSubset + Resolver for REST and use-case responses
 - **@query/@mutation Decorators** - Mark methods, get endpoints instantly
 - **GraphiQL Built-in** - Interactive debugging playground
 - **One-Line MCP Server** - Expose APIs to AI assistants
 - **Auto N+1 Prevention** - DataLoader batch loading for relationships
+- **Custom Relationships + ER Diagram** - Document and load ORM or non-ORM edges
 
-No schema files. No resolvers. No boilerplate.
-Just add decorators to your SQLModel classes.
+No schema files. No handwritten GraphQL resolvers. Minimal boilerplate.
+Use decorators for GraphQL/MCP, or DefineSubset + Resolver for Core API responses.
 
-## 30-Second Quick Start
+## 30-Second GraphQL Quick Start
 
 ```python
 from fastapi import FastAPI
@@ -64,6 +66,12 @@ Run: `uvicorn app:app` and visit `http://localhost:8000/graphql` for the interac
 - **@query/@mutation Decorators** - Mark methods as GraphQL operations
 - **GraphiQL Integration** - Built-in playground for testing and debugging
 
+### Core API Mode
+- **DefineSubset + SubsetConfig** - Build DTOs decoupled from SQLModel entities
+- **Resolver + AutoLoad** - Traverse DTO trees, batch-load relations, run `post_*` hooks
+- **ExposeAs / SendTo / Collector** - Pass context down and aggregate values up
+- **Custom Relationship + ErDiagram** - Support non-ORM edges and Mermaid ER documentation
+
 ### Smart Optimization
 - **Auto N+1 Prevention** - DataLoader batch loading for all relationships
 - **Level-by-Level Resolution** - Relationships loaded in batches per depth level
@@ -102,6 +110,44 @@ running MCP demo
 uv run --with fastmcp python -m demo.mcp_server   # stdio mode
 uv run --with fastmcp python -m demo.mcp_server --http   # http mode
 ```
+
+running Core API demo
+
+```bash
+uv run uvicorn demo.core_api.app:app --reload
+# visit /docs or /api/er-diagram
+```
+
+
+## Core API Quick Start
+
+Use Core API mode when you want the same DataLoader-based batching outside GraphQL,
+such as FastAPI REST endpoints or service-layer response assembly.
+
+```python
+from sqlmodel_graphql import DefineSubset, LoaderRegistry, Resolver
+
+class UserDTO(DefineSubset):
+    __subset__ = (User, ("id", "name"))
+
+class TaskDTO(DefineSubset):
+    __subset__ = (Task, ("id", "title", "owner_id"))
+    owner: UserDTO | None = None
+
+registry = LoaderRegistry(entities=[User, Task], session_factory=async_session)
+
+tasks = [TaskDTO(id=t.id, title=t.title, owner_id=t.owner_id) for t in orm_tasks]
+result = await Resolver(registry).resolve(tasks)
+```
+
+Core API mode also supports:
+
+- implicit or explicit `AutoLoad()`
+- `post_*` derived fields
+- `ExposeAs`, `SendTo`, `Collector` cross-layer data flow
+- custom `Relationship(...)` loaders and `ErDiagram.from_sqlmodel(...)`
+
+See `demo.core_api.app` for a complete FastAPI example.
 
 
 ## Quick Start

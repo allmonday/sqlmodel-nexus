@@ -14,9 +14,9 @@ from sqlmodel_graphql.loader.registry import LoaderRegistry
 from sqlmodel_graphql.resolver import Depends, Loader, Resolver
 from sqlmodel_graphql.subset import DefineSubset
 from tests.conftest import (
-    TestSprint,
-    TestTask,
-    TestUser,
+    FixtureSprint,
+    FixtureTask,
+    FixtureUser,
     get_test_session_factory,
 )
 
@@ -160,22 +160,22 @@ class TestLoaderWithStringName:
 
         session_factory = get_test_session_factory()
         registry = LoaderRegistry(
-            entities=[TestUser, TestSprint, TestTask],
+            entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
 
         class UserDTO(DefineSubset):
-            __subset__ = (TestUser, ("id", "name"))
+            __subset__ = (FixtureUser, ("id", "name"))
 
         class TaskDTO(DefineSubset):
-            __subset__ = (TestTask, ("id", "title", "owner_id"))
+            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
             owner: UserDTO | None = None
 
             def resolve_owner(self, loader=Loader("owner")):
                 return loader.load(self.owner_id)
 
         async with session_factory() as session:
-            tasks = (await session.exec(select(TestTask))).all()
+            tasks = (await session.exec(select(FixtureTask))).all()
 
         dtos = [
             TaskDTO(id=t.id, title=t.title, owner_id=t.owner_id) for t in tasks
@@ -197,19 +197,19 @@ class TestAutoLoadBasic:
 
         session_factory = get_test_session_factory()
         registry = LoaderRegistry(
-            entities=[TestUser, TestSprint, TestTask],
+            entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
 
         class UserDTO(DefineSubset):
-            __subset__ = (TestUser, ("id", "name"))
+            __subset__ = (FixtureUser, ("id", "name"))
 
         class TaskDTO(DefineSubset):
-            __subset__ = (TestTask, ("id", "title", "owner_id"))
+            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
             owner: Annotated[UserDTO | None, AutoLoad()] = None
 
         async with session_factory() as session:
-            tasks = (await session.exec(select(TestTask))).all()
+            tasks = (await session.exec(select(FixtureTask))).all()
 
         dtos = [
             TaskDTO(id=t.id, title=t.title, owner_id=t.owner_id) for t in tasks
@@ -228,23 +228,23 @@ class TestAutoLoadBasic:
 
         session_factory = get_test_session_factory()
         registry = LoaderRegistry(
-            entities=[TestUser, TestSprint, TestTask],
+            entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
 
         class UserDTO(DefineSubset):
-            __subset__ = (TestUser, ("id", "name"))
+            __subset__ = (FixtureUser, ("id", "name"))
 
         class TaskDTO(DefineSubset):
-            __subset__ = (TestTask, ("id", "title", "owner_id"))
+            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
             owner: Annotated[UserDTO | None, AutoLoad()] = None
 
         class SprintDTO(DefineSubset):
-            __subset__ = (TestSprint, ("id", "name"))
+            __subset__ = (FixtureSprint, ("id", "name"))
             tasks: Annotated[list[TaskDTO], AutoLoad()] = []
 
         async with session_factory() as session:
-            sprints = (await session.exec(select(TestSprint))).all()
+            sprints = (await session.exec(select(FixtureSprint))).all()
 
         dtos = [SprintDTO(id=s.id, name=s.name) for s in sprints]
         result = await Resolver(registry).resolve(dtos)
@@ -263,19 +263,19 @@ class TestAutoLoadBasic:
 
         session_factory = get_test_session_factory()
         registry = LoaderRegistry(
-            entities=[TestUser, TestSprint, TestTask],
+            entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
 
         class UserDTO(DefineSubset):
-            __subset__ = (TestUser, ("id", "name"))
+            __subset__ = (FixtureUser, ("id", "name"))
 
         class TaskDTO(DefineSubset):
-            __subset__ = (TestTask, ("id", "title", "owner_id"))
+            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
             owner: Annotated[UserDTO | None, AutoLoad()] = None
 
         class SprintDTO(DefineSubset):
-            __subset__ = (TestSprint, ("id", "name"))
+            __subset__ = (FixtureSprint, ("id", "name"))
             tasks: Annotated[list[TaskDTO], AutoLoad()] = []
             task_count: int = 0
 
@@ -283,7 +283,7 @@ class TestAutoLoadBasic:
                 return len(self.tasks)
 
         async with session_factory() as session:
-            sprints = (await session.exec(select(TestSprint))).all()
+            sprints = (await session.exec(select(FixtureSprint))).all()
 
         dtos = [SprintDTO(id=s.id, name=s.name) for s in sprints]
         result = await Resolver(registry).resolve(dtos)
@@ -303,15 +303,15 @@ class TestAutoLoadBasic:
 
         session_factory = get_test_session_factory()
         registry = LoaderRegistry(
-            entities=[TestUser, TestSprint, TestTask],
+            entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
 
         class UserDTO(DefineSubset):
-            __subset__ = (TestUser, ("id", "name"))
+            __subset__ = (FixtureUser, ("id", "name"))
 
         class TaskDTO(DefineSubset):
-            __subset__ = (TestTask, ("id", "title", "owner_id"))
+            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
             owner: Annotated[UserDTO | None, AutoLoad()] = None
 
             # Manual resolve should override AutoLoad
@@ -319,7 +319,7 @@ class TestAutoLoadBasic:
                 return UserDTO(id=999, name="Manual Override")
 
         async with session_factory() as session:
-            tasks = (await session.exec(select(TestTask))).all()
+            tasks = (await session.exec(select(FixtureTask))).all()
 
         dtos = [
             TaskDTO(id=t.id, title=t.title, owner_id=t.owner_id) for t in tasks
@@ -335,15 +335,15 @@ class TestAutoLoadBasic:
 
         session_factory = get_test_session_factory()
         registry = LoaderRegistry(
-            entities=[TestUser, TestSprint, TestTask],
+            entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
 
         class UserDTO(DefineSubset):
-            __subset__ = (TestUser, ("id", "name"))
+            __subset__ = (FixtureUser, ("id", "name"))
 
         class TaskDTO(DefineSubset):
-            __subset__ = (TestTask, ("id", "title", "owner_id"))
+            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
             owner: Annotated[UserDTO | None, AutoLoad()] = None
 
         # Create a task with a non-existent FK value
@@ -359,7 +359,7 @@ class TestAutoLoadSubsetFields:
         """DefineSubset should store __subset_fields__."""
 
         class UserDTO(DefineSubset):
-            __subset__ = (TestUser, ("id", "name"))
+            __subset__ = (FixtureUser, ("id", "name"))
 
         assert hasattr(UserDTO, "__subset_fields__")
         assert UserDTO.__subset_fields__ == ["id", "name"]
@@ -368,7 +368,7 @@ class TestAutoLoadSubsetFields:
         """__subset_fields__ should include FK fields."""
 
         class TaskDTO(DefineSubset):
-            __subset__ = (TestTask, ("id", "title", "owner_id"))
+            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
 
         assert "owner_id" in TaskDTO.__subset_fields__
 
@@ -376,7 +376,7 @@ class TestAutoLoadSubsetFields:
         """__subset_fields__ should only include selected fields."""
 
         class TaskDTO(DefineSubset):
-            __subset__ = (TestTask, ("id", "title"))
+            __subset__ = (FixtureTask, ("id", "title"))
 
         assert "owner_id" not in TaskDTO.__subset_fields__
         assert TaskDTO.__subset_fields__ == ["id", "title"]
@@ -393,20 +393,20 @@ class TestImplicitAutoLoad:
 
         session_factory = get_test_session_factory()
         registry = LoaderRegistry(
-            entities=[TestUser, TestSprint, TestTask],
+            entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
 
         class UserDTO(DefineSubset):
-            __subset__ = (TestUser, ("id", "name"))
+            __subset__ = (FixtureUser, ("id", "name"))
 
         class TaskDTO(DefineSubset):
-            __subset__ = (TestTask, ("id", "title", "owner_id"))
+            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
             # No AutoLoad() — field name 'owner' matches Task.owner relationship
             owner: UserDTO | None = None
 
         async with session_factory() as session:
-            tasks = (await session.exec(select(TestTask))).all()
+            tasks = (await session.exec(select(FixtureTask))).all()
 
         dtos = [
             TaskDTO(id=t.id, title=t.title, owner_id=t.owner_id) for t in tasks
@@ -425,24 +425,24 @@ class TestImplicitAutoLoad:
 
         session_factory = get_test_session_factory()
         registry = LoaderRegistry(
-            entities=[TestUser, TestSprint, TestTask],
+            entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
 
         class UserDTO(DefineSubset):
-            __subset__ = (TestUser, ("id", "name"))
+            __subset__ = (FixtureUser, ("id", "name"))
 
         class TaskDTO(DefineSubset):
-            __subset__ = (TestTask, ("id", "title", "owner_id"))
+            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
             owner: UserDTO | None = None
 
         class SprintDTO(DefineSubset):
-            __subset__ = (TestSprint, ("id", "name"))
+            __subset__ = (FixtureSprint, ("id", "name"))
             # No AutoLoad() — field name 'tasks' matches Sprint.tasks relationship
             tasks: list[TaskDTO] = []
 
         async with session_factory() as session:
-            sprints = (await session.exec(select(TestSprint))).all()
+            sprints = (await session.exec(select(FixtureSprint))).all()
 
         dtos = [SprintDTO(id=s.id, name=s.name) for s in sprints]
         result = await Resolver(registry).resolve(dtos)
@@ -460,19 +460,19 @@ class TestImplicitAutoLoad:
 
         session_factory = get_test_session_factory()
         registry = LoaderRegistry(
-            entities=[TestUser, TestSprint, TestTask],
+            entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
 
         class UserDTO(DefineSubset):
-            __subset__ = (TestUser, ("id", "name"))
+            __subset__ = (FixtureUser, ("id", "name"))
 
         class TaskDTO(DefineSubset):
-            __subset__ = (TestTask, ("id", "title", "owner_id"))
+            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
             owner: UserDTO | None = None
 
         class SprintDTO(DefineSubset):
-            __subset__ = (TestSprint, ("id", "name"))
+            __subset__ = (FixtureSprint, ("id", "name"))
             tasks: list[TaskDTO] = []
             task_count: int = 0
 
@@ -480,7 +480,7 @@ class TestImplicitAutoLoad:
                 return len(self.tasks)
 
         async with session_factory() as session:
-            sprints = (await session.exec(select(TestSprint))).all()
+            sprints = (await session.exec(select(FixtureSprint))).all()
 
         dtos = [SprintDTO(id=s.id, name=s.name) for s in sprints]
         result = await Resolver(registry).resolve(dtos)
@@ -494,21 +494,21 @@ class TestImplicitAutoLoad:
 
         session_factory = get_test_session_factory()
         registry = LoaderRegistry(
-            entities=[TestUser, TestSprint, TestTask],
+            entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
 
         class UserDTO(DefineSubset):
-            __subset__ = (TestUser, ("id", "name"))
+            __subset__ = (FixtureUser, ("id", "name"))
 
         class TaskDTO(DefineSubset):
-            __subset__ = (TestTask, ("id", "title", "owner_id"))
-            # 'assignee' does NOT match any relationship on TestTask
+            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
+            # 'assignee' does NOT match any relationship on FixtureTask
             # (only 'owner' and 'sprint' are relationships)
             assignee: UserDTO | None = None
 
         async with session_factory() as session:
-            tasks = (await session.exec(select(TestTask))).all()
+            tasks = (await session.exec(select(FixtureTask))).all()
 
         dtos = [
             TaskDTO(id=t.id, title=t.title, owner_id=t.owner_id) for t in tasks
@@ -524,19 +524,19 @@ class TestImplicitAutoLoad:
 
         session_factory = get_test_session_factory()
         registry = LoaderRegistry(
-            entities=[TestUser, TestSprint, TestTask],
+            entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
 
         class UserDTO(DefineSubset):
-            __subset__ = (TestUser, ("id", "name"))
+            __subset__ = (FixtureUser, ("id", "name"))
 
         class TaskDTO(DefineSubset):
-            __subset__ = (TestTask, ("id", "title", "owner_id"))
+            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
             owner: Annotated[UserDTO | None, AutoLoad()] = None
 
         async with session_factory() as session:
-            tasks = (await session.exec(select(TestTask))).all()
+            tasks = (await session.exec(select(FixtureTask))).all()
 
         dtos = [
             TaskDTO(id=t.id, title=t.title, owner_id=t.owner_id) for t in tasks

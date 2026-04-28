@@ -11,37 +11,37 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 # Test models (Sprint / Task / User for resolve/post/context testing)
 # ──────────────────────────────────────────────────────────
 
-class TestBase(SQLModel):
+class FixtureBase(SQLModel):
     """Base class for test entities."""
     pass
 
 
-class TestUser(TestBase, table=True):
+class FixtureUser(FixtureBase, table=True):
     __tablename__ = "test_user"
 
     id: int | None = Field(default=None, primary_key=True)
     name: str
     email: str
 
-    tasks: list["TestTask"] = Relationship(
+    tasks: list["FixtureTask"] = Relationship(
         back_populates="owner",
-        sa_relationship_kwargs={"order_by": "TestTask.id"},
+        sa_relationship_kwargs={"order_by": "FixtureTask.id"},
     )
 
 
-class TestSprint(TestBase, table=True):
+class FixtureSprint(FixtureBase, table=True):
     __tablename__ = "test_sprint"
 
     id: int | None = Field(default=None, primary_key=True)
     name: str
 
-    tasks: list["TestTask"] = Relationship(
+    tasks: list["FixtureTask"] = Relationship(
         back_populates="sprint",
-        sa_relationship_kwargs={"order_by": "TestTask.id"},
+        sa_relationship_kwargs={"order_by": "FixtureTask.id"},
     )
 
 
-class TestTask(TestBase, table=True):
+class FixtureTask(FixtureBase, table=True):
     __tablename__ = "test_task"
 
     id: int | None = Field(default=None, primary_key=True)
@@ -49,8 +49,8 @@ class TestTask(TestBase, table=True):
     sprint_id: int = Field(foreign_key="test_sprint.id")
     owner_id: int = Field(foreign_key="test_user.id")
 
-    sprint: Optional["TestSprint"] = Relationship(back_populates="tasks")
-    owner: Optional["TestUser"] = Relationship(back_populates="tasks")
+    sprint: Optional["FixtureSprint"] = Relationship(back_populates="tasks")
+    owner: Optional["FixtureUser"] = Relationship(back_populates="tasks")
 
 
 # ──────────────────────────────────────────────────────────
@@ -94,14 +94,14 @@ async def seed_test_data():
     session_factory = get_test_session_factory()
     async with session_factory() as session:
         # Check existing
-        result = await session.exec(select(TestUser))
+        result = await session.exec(select(FixtureUser))
         if result.first():
             return
 
         # Users
         users = [
-            TestUser(name="Alice", email="alice@test.com"),
-            TestUser(name="Bob", email="bob@test.com"),
+            FixtureUser(name="Alice", email="alice@test.com"),
+            FixtureUser(name="Bob", email="bob@test.com"),
         ]
         for u in users:
             session.add(u)
@@ -111,8 +111,8 @@ async def seed_test_data():
 
         # Sprints
         sprints = [
-            TestSprint(name="Sprint 1"),
-            TestSprint(name="Sprint 2"),
+            FixtureSprint(name="Sprint 1"),
+            FixtureSprint(name="Sprint 2"),
         ]
         for s in sprints:
             session.add(s)
@@ -122,10 +122,10 @@ async def seed_test_data():
 
         # Tasks
         tasks = [
-            TestTask(title="Task A", sprint_id=sprints[0].id, owner_id=users[0].id),
-            TestTask(title="Task B", sprint_id=sprints[0].id, owner_id=users[1].id),
-            TestTask(title="Task C", sprint_id=sprints[1].id, owner_id=users[0].id),
-            TestTask(title="Task D", sprint_id=sprints[1].id, owner_id=users[1].id),
+            FixtureTask(title="Task A", sprint_id=sprints[0].id, owner_id=users[0].id),
+            FixtureTask(title="Task B", sprint_id=sprints[0].id, owner_id=users[1].id),
+            FixtureTask(title="Task C", sprint_id=sprints[1].id, owner_id=users[0].id),
+            FixtureTask(title="Task D", sprint_id=sprints[1].id, owner_id=users[1].id),
         ]
         for t in tasks:
             session.add(t)

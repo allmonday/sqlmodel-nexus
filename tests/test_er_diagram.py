@@ -6,7 +6,7 @@ import pytest
 from sqlmodel import Field, Relationship, SQLModel
 
 from sqlmodel_graphql.er_diagram import ErDiagram, RelationType
-from tests.conftest import TestSprint, TestTask, TestUser
+from tests.conftest import FixtureSprint, FixtureTask, FixtureUser
 
 # ──────────────────────────────────────────────────────────
 # Simple test entities (no DB needed)
@@ -81,12 +81,12 @@ class TestErDiagram:
     def test_from_sqlmodel_with_three_entities(self):
         """ErDiagram should handle the full test model (User, Sprint, Task)."""
 
-        diagram = ErDiagram.from_sqlmodel([TestUser, TestSprint, TestTask])
+        diagram = ErDiagram.from_sqlmodel([FixtureUser, FixtureSprint, FixtureTask])
 
         entity_names = {e.name for e in diagram.entities}
-        assert entity_names == {"TestUser", "TestSprint", "TestTask"}
+        assert entity_names == {"FixtureUser", "FixtureSprint", "FixtureTask"}
 
-        task_entity = next(e for e in diagram.entities if e.name == "TestTask")
+        task_entity = next(e for e in diagram.entities if e.name == "FixtureTask")
         rel_names = {r.name for r in task_entity.relationships}
         assert "sprint" in rel_names
         assert "owner" in rel_names
@@ -95,13 +95,13 @@ class TestErDiagram:
     def test_to_mermaid_with_complex_model(self):
         """to_mermaid should handle complex multi-entity diagrams."""
 
-        diagram = ErDiagram.from_sqlmodel([TestUser, TestSprint, TestTask])
+        diagram = ErDiagram.from_sqlmodel([FixtureUser, FixtureSprint, FixtureTask])
         mermaid = diagram.to_mermaid()
 
         assert "erDiagram" in mermaid
-        assert "TestUser" in mermaid
-        assert "TestSprint" in mermaid
-        assert "TestTask" in mermaid
+        assert "FixtureUser" in mermaid
+        assert "FixtureSprint" in mermaid
+        assert "FixtureTask" in mermaid
         # Should have relationship lines
         assert "||--o{" in mermaid or "}o--o{" in mermaid
 

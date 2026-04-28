@@ -12,9 +12,9 @@ from sqlmodel_graphql.loader.registry import LoaderRegistry
 from sqlmodel_graphql.resolver import Loader, Resolver
 from sqlmodel_graphql.subset import DefineSubset
 from tests.conftest import (
-    TestSprint,
-    TestTask,
-    TestUser,
+    FixtureSprint,
+    FixtureTask,
+    FixtureUser,
     get_test_session_factory,
 )
 
@@ -166,15 +166,15 @@ class TestResolverLoader:
 
         session_factory = get_test_session_factory()
         registry = LoaderRegistry(
-            entities=[TestUser, TestSprint, TestTask],
+            entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
 
         class UserDTO(DefineSubset):
-            __subset__ = (TestUser, ("id", "name"))
+            __subset__ = (FixtureUser, ("id", "name"))
 
         class TaskDTO(DefineSubset):
-            __subset__ = (TestTask, ("id", "title", "owner_id"))
+            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
             owner: UserDTO | None = None
 
             def resolve_owner(self, loader=Loader("owner")):
@@ -182,7 +182,7 @@ class TestResolverLoader:
 
         # Get tasks from DB — construct DTOs from scalar fields only
         async with session_factory() as session:
-            tasks = (await session.exec(select(TestTask))).all()
+            tasks = (await session.exec(select(FixtureTask))).all()
 
         dtos = [
             TaskDTO(id=t.id, title=t.title, owner_id=t.owner_id) for t in tasks
@@ -199,22 +199,22 @@ class TestResolverLoader:
 
         session_factory = get_test_session_factory()
         registry = LoaderRegistry(
-            entities=[TestUser, TestSprint, TestTask],
+            entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
 
         class UserDTO(DefineSubset):
-            __subset__ = (TestUser, ("id", "name"))
+            __subset__ = (FixtureUser, ("id", "name"))
 
         class TaskDTO(DefineSubset):
-            __subset__ = (TestTask, ("id", "title", "owner_id"))
+            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
             owner: UserDTO | None = None
 
             def resolve_owner(self, loader=Loader("owner")):
                 return loader.load(self.owner_id)
 
         async with session_factory() as session:
-            tasks = (await session.exec(select(TestTask))).all()
+            tasks = (await session.exec(select(FixtureTask))).all()
 
         dtos = [
             TaskDTO(id=t.id, title=t.title, owner_id=t.owner_id) for t in tasks
@@ -236,22 +236,22 @@ class TestResolverNested:
 
         session_factory = get_test_session_factory()
         registry = LoaderRegistry(
-            entities=[TestUser, TestSprint, TestTask],
+            entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
 
         class UserDTO(DefineSubset):
-            __subset__ = (TestUser, ("id", "name"))
+            __subset__ = (FixtureUser, ("id", "name"))
 
         class TaskDTO(DefineSubset):
-            __subset__ = (TestTask, ("id", "title", "owner_id"))
+            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
             owner: UserDTO | None = None
 
             def resolve_owner(self, loader=Loader("owner")):
                 return loader.load(self.owner_id)
 
         async with session_factory() as session:
-            tasks = (await session.exec(select(TestTask))).all()
+            tasks = (await session.exec(select(FixtureTask))).all()
 
         dtos = [
             TaskDTO(id=t.id, title=t.title, owner_id=t.owner_id) for t in tasks

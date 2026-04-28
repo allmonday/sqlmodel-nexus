@@ -128,19 +128,34 @@ class Resolver:
         # Loader instance cache for Depends-based loaders
         self._loader_cache: dict[Any, DataLoader] = {}
 
-    def _get_loader(self, loader_name: str) -> DataLoader | None:
-        """Get a DataLoader by name from the registry."""
+    def _get_loader(self, node: Any, loader_name: str) -> DataLoader | None:
+        """Get a DataLoader by name from the registry.
+
+        DefineSubset DTOs resolve loaders within their source entity first,
+        avoiding collisions when multiple entities share the same relationship
+        name.
+        """
         if self._registry is None:
             return None
+
+        from sqlmodel_graphql.subset import get_subset_source
+
+        source_entity = None
+        if isinstance(node, BaseModel):
+            source_entity = get_subset_source(type(node))
+        if source_entity is not None:
+            loader = self._registry.get_loader_for_entity(source_entity, loader_name)
+            if loader is not None:
+                return loader
         return self._registry.get_loader_by_name(loader_name)
 
-    def _resolve_dep(self, dep: Depends) -> DataLoader | None:
+    def _resolve_dep(self, node: Any, dep: Depends) -> DataLoader | None:
         """Resolve a Depends wrapper to a DataLoader instance."""
         dep_val = dep.dependency
         if dep_val is None:
             return None
         if isinstance(dep_val, str):
-            return self._get_loader(dep_val)
+            return self._get_loader(node, dep_val)
         if isinstance(dep_val, type) and issubclass(dep_val, DataLoader):
             return self._get_or_create_loader(dep_val)
         if callable(dep_val):
@@ -334,7 +349,7 @@ class Resolver:
         field_info: Any,
     ) -> None:
         """Execute auto-resolve for an AutoLoad field and set on node."""
-        loader = self._get_loader(rel_name)
+        loader = self._get_loader(node, rel_name)
         if loader is None:
             return
 
@@ -503,7 +518,7 @@ class Resolver:
             if param.default is not inspect.Parameter.empty and isinstance(
                 param.default, Depends
             ):
-                loader = self._resolve_dep(param.default)
+                loader = self._resolve_dep(node, param.default)
                 if loader is not None:
                     params[param_name] = loader
                 continue
@@ -638,6 +653,8 @@ class Resolver:
         Returns:
             The same node with all resolve_* and post_* fields populated.
         """
+        if self._registry is not None and hasattr(self._registry, "clear_cache"):
+            self._registry.clear_cache()
         self._node_collectors.clear()
         self._loader_cache.clear()
         await self._traverse(node, None)

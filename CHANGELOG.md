@@ -12,10 +12,14 @@
 - **Pagination for list relationships** — one-to-many and many-to-many relationships support `limit`/`offset` pagination with `has_more` and `total_count`, powered by `ROW_NUMBER()` window functions
 - **`enable_pagination`** flag on `GraphQLHandler` — when `True`, list relationships expose `EntityResult` types with `items` + `pagination` fields in the GraphQL schema
 - **`session_factory`** parameter on `GraphQLHandler` — required for DataLoader queries; pass your async session factory
+- **Core API mode** — `DefineSubset`, `SubsetConfig`, `Resolver`, `Loader`, and `AutoLoad` support DTO-first response assembly outside GraphQL
+- **Cross-layer data flow** — `ExposeAs`, `SendTo`, and `Collector` allow descendant context passing and upward aggregation during response assembly
+- **Custom relationships + ER diagram** — define non-ORM `Relationship(...)` loaders and render Mermaid ER diagrams with `ErDiagram`
 
 ### Changes
 
 - `GraphQLHandler` accepts `session_factory` and `enable_pagination` parameters
+- Export `LoaderRegistry` from the top-level package namespace for Core API usage
 - SDL generator excludes FK fields from entity types and generates `Pagination` / `EntityResult` types when pagination is enabled
 - Introspection generator mirrors SDL behavior: FK field filtering, pagination type awareness, `limit`/`offset` args on list relationship fields
 - `@query` / `@mutation` methods no longer receive `query_meta` — relationships are resolved by the framework after the root method returns
