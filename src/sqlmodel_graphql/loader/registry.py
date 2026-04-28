@@ -20,6 +20,7 @@ from sqlmodel_graphql.loader.factories import (
     create_page_many_to_many_loader,
     create_page_one_to_many_loader,
 )
+from sqlmodel_graphql.relationship import Relationship, get_custom_relationships
 
 logger = logging.getLogger(__name__)
 
@@ -266,6 +267,27 @@ def _inspect_relationships(
     return results
 
 
+def _build_custom_relationship_info(rel: Relationship) -> RelationshipInfo:
+    """Convert a custom Relationship to a RelationshipInfo with a DataLoader class."""
+    loader_fn = rel.loader
+
+    class _CustomLoader(DataLoader):
+        async def batch_load_fn(self, keys):
+            return await loader_fn(keys)
+
+    _CustomLoader.__name__ = f"CustomLoader_{rel.name}"
+    _CustomLoader.__qualname__ = f"CustomLoader_{rel.name}"
+
+    return RelationshipInfo(
+        name=rel.name,
+        direction="CUSTOM",
+        fk_field=rel.fk,
+        target_entity=rel.target,
+        is_list=rel.is_list,
+        loader=_CustomLoader,
+    )
+
+
 class LoaderRegistry:
     """Registry of DataLoader instances keyed by (entity, relationship_name).
 
@@ -290,6 +312,18 @@ class LoaderRegistry:
         for entity in entities:
             rels = _inspect_relationships(entity, all_entities, session_factory)
             self._registry[entity] = {r.name: r for r in rels}
+
+        # Register custom relationships from __relationships__
+        for entity in entities:
+            custom_rels = get_custom_relationships(entity)
+            entity_rels = self._registry.setdefault(entity, {})
+            for rel in custom_rels:
+                if rel.name in entity_rels:
+                    raise ValueError(
+                        f"Custom relationship '{rel.name}' on {entity.__name__} "
+                        f"conflicts with an existing relationship name"
+                    )
+                entity_rels[rel.name] = _build_custom_relationship_info(rel)
 
         if enable_pagination:
             self._validate_pagination()
@@ -331,3 +365,32 @@ class LoaderRegistry:
     def clear_cache(self) -> None:
         """Clear cached loader instances (call at start of each request)."""
         self._loader_instances.clear()
+
+    def get_loader_by_name(self, name: str) -> DataLoader | None:
+        """Get a DataLoader by relationship name.
+
+        Searches all registered entities for a relationship with the given name.
+        Returns the first match, or None if not found.
+
+        Used by Resolver for Core API mode Loader() parameter injection.
+        """
+        for entity_rels in self._registry.values():
+            rel_info = entity_rels.get(name)
+            if rel_info is not None:
+                return self.get_loader(rel_info.loader)
+        return None
+
+    def get_loader_for_entity(
+        self, entity: type[SQLModel], rel_name: str
+    ) -> DataLoader | None:
+        """Get a DataLoader for a specific entity's relationship.
+
+        Returns None if the entity or relationship is not registered.
+        """
+        entity_rels = self._registry.get(entity)
+        if entity_rels is None:
+            return None
+        rel_info = entity_rels.get(rel_name)
+        if rel_info is None:
+            return None
+        return self.get_loader(rel_info.loader)
