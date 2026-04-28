@@ -117,11 +117,11 @@ class Resolver:
         )
         # Ancestor context: dict of {alias: value} from ExposeAs fields
         self._ancestor_var: contextvars.ContextVar[dict[str, Any]] = (
-            contextvars.ContextVar("ancestors", default={})
+            contextvars.ContextVar("ancestors", default=None)
         )
         # Collectors: dict of {alias: Collector} active in current scope
         self._collector_var: contextvars.ContextVar[dict[str, ICollector]] = (
-            contextvars.ContextVar("collectors", default={})
+            contextvars.ContextVar("collectors", default=None)
         )
         # Per-node collector instances (for Collector parameter injection)
         self._node_collectors: dict[int, dict[str, ICollector]] = {}
@@ -401,7 +401,7 @@ class Resolver:
             return lambda: None
 
         current = self._ancestor_var.get()
-        new_context = dict(current)
+        new_context = dict(current or {})
         for field_name, alias in expose_map.items():
             new_context[alias] = getattr(node, field_name, None)
 
@@ -450,7 +450,7 @@ class Resolver:
 
         # Merge with existing ancestor collectors (propagate downward)
         current = self._collector_var.get()
-        merged = dict(current)
+        merged = dict(current or {})
         merged.update(new_collectors)
 
         token = self._collector_var.set(merged)
@@ -465,7 +465,7 @@ class Resolver:
         if not send_to_map:
             return
 
-        collectors = self._collector_var.get()
+        collectors = self._collector_var.get() or {}
         for field_name, collector_names in send_to_map.items():
             value = getattr(node, field_name, None)
             if value is None:
@@ -511,7 +511,7 @@ class Resolver:
                 params["parent"] = self._parent_var.get()
                 continue
             if param_name == "ancestor_context":
-                params["ancestor_context"] = self._ancestor_var.get()
+                params["ancestor_context"] = self._ancestor_var.get() or {}
                 continue
 
             # Check for Depends (Loader) default
@@ -547,7 +547,7 @@ class Resolver:
                 params["parent"] = self._parent_var.get()
                 continue
             if param_name == "ancestor_context":
-                params["ancestor_context"] = self._ancestor_var.get()
+                params["ancestor_context"] = self._ancestor_var.get() or {}
                 continue
 
             # Check for Collector default
@@ -589,7 +589,7 @@ class Resolver:
             auto_load_entries = self._scan_auto_load_fields(node)
 
             resolve_tasks = []
-            for field_name, trim_field, method in resolve_methods:
+            for _field_name, trim_field, method in resolve_methods:
                 resolve_tasks.append(
                     self._resolve_and_set(node, trim_field, method)
                 )
@@ -604,7 +604,7 @@ class Resolver:
 
             # Phase 1b: Traverse existing object fields (non-resolve)
             object_fields = self._get_object_fields(node)
-            for field_name, child in object_fields:
+            for _field_name, child in object_fields:
                 resolve_tasks.append(self._traverse(child, node))
 
             await asyncio.gather(*resolve_tasks)
@@ -612,7 +612,7 @@ class Resolver:
             # Phase 2: Execute post_* methods (after all resolves complete)
             post_methods = self._scan_post_methods(node)
             post_tasks = []
-            for field_name, trim_field, method in post_methods:
+            for _field_name, trim_field, method in post_methods:
                 post_tasks.append(
                     self._post_and_set(node, trim_field, method)
                 )

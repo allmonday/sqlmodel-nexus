@@ -12,9 +12,8 @@ Level 5: Custom __relationships__ + AutoLoad (TaskWithTags, SprintWithTags)
 
 from typing import Annotated
 
-from sqlmodel_graphql import AutoLoad, Collector, DefineSubset, ExposeAs, SendTo, SubsetConfig
 from demo.core_api.models import Sprint, Tag, Task, User
-
+from sqlmodel_graphql import AutoLoad, Collector, DefineSubset, SubsetConfig
 
 # ──────────────────────────────────────────────────────────
 # Level 1: Basic DefineSubset — field selection + FK hiding
@@ -99,7 +98,9 @@ class TaskDetail(DefineSubset):
     owner: UserSummary | None = None
     full_title: str = ""
 
-    def post_full_title(self, ancestor_context={}):
+    def post_full_title(self, ancestor_context=None):
+        if ancestor_context is None:
+            ancestor_context = {}
         sprint_name = ancestor_context.get('sprint_name', 'unknown')
         return f"{sprint_name} / {self.title}"
 

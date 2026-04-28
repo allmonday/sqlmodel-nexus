@@ -401,7 +401,7 @@ def _build_config_overrides(config: SubsetConfig) -> dict[str, Any]:
         extras = [ExposeAs(alias)]
         if fname in send_map:
             extras.append(SendTo(send_map[fname]))
-        overrides[fname] = Annotated[tuple, *extras]  # type: ignore[misc]
+        overrides[fname] = Annotated[(tuple, *extras)]  # type: ignore[misc]
 
     for fname, target in send_map.items():
         if fname not in overrides:

@@ -21,7 +21,9 @@ class TestExposeAs:
             name: str
             parent_greeting: str = ""
 
-            def post_parent_greeting(self, ancestor_context={}):
+            def post_parent_greeting(self, ancestor_context=None):
+                if ancestor_context is None:
+                    ancestor_context = {}
                 return ancestor_context.get("greeting", "no greeting")
 
         class Parent(BaseModel):
@@ -44,7 +46,9 @@ class TestExposeAs:
             name: str
             root_name: str = ""
 
-            def post_root_name(self, ancestor_context={}):
+            def post_root_name(self, ancestor_context=None):
+                if ancestor_context is None:
+                    ancestor_context = {}
                 return ancestor_context.get("root_name", "unknown")
 
         class Child(BaseModel):
@@ -77,7 +81,9 @@ class TestExposeAs:
             def resolve_name(self):
                 return f"child_{self.name}"
 
-            def post_full_label(self, ancestor_context={}):
+            def post_full_label(self, ancestor_context=None):
+                if ancestor_context is None:
+                    ancestor_context = {}
                 prefix = ancestor_context.get("prefix", "")
                 return f"{prefix}/{self.name}"
 
@@ -101,7 +107,9 @@ class TestExposeAs:
         class Child(BaseModel):
             info: str = ""
 
-            def post_info(self, ancestor_context={}):
+            def post_info(self, ancestor_context=None):
+                if ancestor_context is None:
+                    ancestor_context = {}
                 return f"{ancestor_context.get('a', '')}-{ancestor_context.get('b', '')}"
 
         class Parent(BaseModel):
@@ -235,7 +243,9 @@ class TestCombinedContext:
             full_title: str = ""
             completed: Annotated[bool, SendTo("completed_tasks")] = False
 
-            def post_full_title(self, ancestor_context={}):
+            def post_full_title(self, ancestor_context=None):
+                if ancestor_context is None:
+                    ancestor_context = {}
                 sprint_name = ancestor_context.get("sprint_name", "unknown")
                 return f"{sprint_name} / {self.title}"
 
@@ -274,7 +284,9 @@ class TestCombinedContext:
             def resolve_name(self):
                 return "resolved_child"
 
-            def post_label(self, ancestor_context={}):
+            def post_label(self, ancestor_context=None):
+                if ancestor_context is None:
+                    ancestor_context = {}
                 prefix = ancestor_context.get("prefix", "?")
                 return f"{prefix}:{self.name}"
 

@@ -202,7 +202,7 @@ class QueryExecutor:
         loader = self._registry.get_loader(rel_info.loader)
         results = await loader.load_many(fk_values)
 
-        for parent, result in zip(parents, results):
+        for parent, result in zip(parents, results, strict=True):
             if rel_info.is_list:
                 items = result or []
                 self._store(parent, rel_info.name, items)
@@ -235,7 +235,7 @@ class QueryExecutor:
 
         all_items = []
 
-        for parent, page_result in zip(parents, results):
+        for parent, page_result in zip(parents, results, strict=True):
             self._store(parent, rel_info.name, page_result)
             if page_result and page_result.get("items"):
                 all_items.extend(page_result["items"])
@@ -339,7 +339,11 @@ class QueryExecutor:
             if wants_pagination and pagination:
                 # Filter pagination fields by user selection
                 pag_sel = child_sel.sub_fields.get("pagination")
-                pag_fields = set(pag_sel.sub_fields.keys()) if pag_sel and pag_sel.sub_fields else None
+                pag_fields = (
+                    set(pag_sel.sub_fields.keys())
+                    if pag_sel and pag_sel.sub_fields
+                    else None
+                )
                 if isinstance(pagination, dict):
                     raw = pagination
                 else:

@@ -6,7 +6,7 @@ Adapted from pydantic-resolve's graphql.pagination.types module.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field, create_model
 
@@ -54,7 +54,7 @@ def _build_pagination_model(pagination_selection: set[str]) -> type[BaseModel]:
     if "has_more" in pagination_selection:
         fields["has_more"] = (bool, False)
     if "total_count" in pagination_selection:
-        fields["total_count"] = (Optional[int], None)
+        fields["total_count"] = (int | None, None)
 
     if not fields:
         return Pagination

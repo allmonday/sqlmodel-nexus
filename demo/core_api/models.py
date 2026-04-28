@@ -51,8 +51,9 @@ async def _tags_by_task_loader(task_ids: list[int]) -> list[list[Tag]]:
         JOIN core_api_task_tag tt ON t.id = tt.tag_id
         WHERE tt.task_id IN (:task_ids)
     """
+    from sqlmodel import select
+
     from demo.core_api.database import async_session
-    from sqlmodel import select, col
 
     async with async_session() as session:
         # For demo simplicity, return all tags for each task

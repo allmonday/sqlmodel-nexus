@@ -11,8 +11,8 @@ For the Core API models (Sprint/Task/User), see:
     then GET /api/er-diagram
 """
 
-from sqlmodel_graphql import ErDiagram
 from demo.models import Comment, Post, User
+from sqlmodel_graphql import ErDiagram
 
 
 def main():

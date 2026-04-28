@@ -26,16 +26,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import select
 
 from demo.core_api.database import async_session, init_db
-from demo.core_api.models import Sprint, Tag, Task, User
 from demo.core_api.dtos import (
     SprintDetail,
     SprintSummary,
     SprintWithTags,
     TaskSummary,
 )
+from demo.core_api.models import Sprint, Tag, Task, User
 from sqlmodel_graphql import ErDiagram, Resolver
 from sqlmodel_graphql.loader import LoaderRegistry
-
 
 # LoaderRegistry inspects ORM metadata and creates DataLoaders for all
 # relationships between the provided entities.

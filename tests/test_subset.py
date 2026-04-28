@@ -14,6 +14,7 @@ from sqlmodel_graphql.subset import (
     DefineSubset,
     get_subset_source,
 )
+from tests.conftest import FixtureSprint, FixtureTask, FixtureUser, get_test_session_factory
 
 # ──────────────────────────────────────────────────────────
 # Test entities
@@ -90,7 +91,7 @@ class TestDefineSubsetBasic:
             __subset__ = (SampleUser, ("id", "name"))
 
         assert UserSummary.model_fields["id"].annotation == int | None
-        assert UserSummary.model_fields["name"].annotation == str
+        assert UserSummary.model_fields["name"].annotation == str  # noqa: E721
 
 
 # ──────────────────────────────────────────────────────────
@@ -280,9 +281,6 @@ class TestDefineSubsetNested:
 # ──────────────────────────────────────────────────────────
 # Test: SQLModel type validation for relationship fields
 # ──────────────────────────────────────────────────────────
-
-# Need table=True entities for SQLAlchemy relationship inspection
-from tests.conftest import FixtureSprint, FixtureTask, FixtureUser, get_test_session_factory
 
 
 class TestSQLModelRelationshipTypeValidation:
@@ -568,7 +566,9 @@ class TestSubsetConfigIntegration:
             )
             parent_name: str = ""
 
-            def post_parent_name(self, ancestor_context={}):
+            def post_parent_name(self, ancestor_context=None):
+                if ancestor_context is None:
+                    ancestor_context = {}
                 return ancestor_context.get("sprint_name", "unknown")
 
         class ParentDTO(DefineSubset):
@@ -673,7 +673,9 @@ class TestSubsetConfigIntegration:
             owner: UserDTO | None = None
             full_title: str = ""
 
-            def post_full_title(self, ancestor_context={}):
+            def post_full_title(self, ancestor_context=None):
+                if ancestor_context is None:
+                    ancestor_context = {}
                 sprint_name = ancestor_context.get("sprint_name", "unknown")
                 return f"{sprint_name} / {self.title}"
 

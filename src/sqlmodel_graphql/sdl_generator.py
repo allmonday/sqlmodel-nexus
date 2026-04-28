@@ -428,7 +428,7 @@ class SDLGenerator:
         # Generate Result types for each paginated relationship
         for entity in self.entities:
             rels = self._loader_registry.get_relationships(entity)
-            for rel_name, rel_info in rels.items():
+            for _rel_name, rel_info in rels.items():
                 if rel_info.is_list and rel_info.page_loader is not None:
                     target_name = rel_info.target_entity.__name__
                     result_type_name = f"{target_name}Result"

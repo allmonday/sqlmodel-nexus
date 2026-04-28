@@ -131,7 +131,7 @@ class TestGetCustomRelationships:
         assert rels[0].is_list is True
 
     def test_entity_without_relationships(self):
-        """get_custom_relationships should return empty list for entities without __relationships__."""
+        """get_custom_relationships returns empty list without __relationships__."""
         rels = get_custom_relationships(RelUser)
         assert rels == []
 
