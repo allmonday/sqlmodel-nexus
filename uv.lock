@@ -1602,7 +1602,7 @@ wheels = [
 ]
 
 [[package]]
-name = "sqlmodel-graphql"
+name = "sqlmodel-nexus"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [

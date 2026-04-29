@@ -6,10 +6,10 @@ import pytest
 from pydantic import BaseModel
 from sqlmodel import Field, SQLModel
 
-from sqlmodel_graphql import DefineSubset, ErDiagram, Relationship
-from sqlmodel_graphql.loader.registry import ErManager, _build_custom_relationship_info
-from sqlmodel_graphql.relationship import get_custom_relationships
-from sqlmodel_graphql.resolver import Loader, Resolver
+from sqlmodel_nexus import DefineSubset, ErDiagram, Relationship
+from sqlmodel_nexus.loader.registry import ErManager, _build_custom_relationship_info
+from sqlmodel_nexus.relationship import get_custom_relationships
+from sqlmodel_nexus.resolver import Loader, Resolver
 from tests.conftest import FixtureSprint, FixtureTask, FixtureUser
 
 # ──────────────────────────────────────────────────────────

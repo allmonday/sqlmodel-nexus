@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from sqlmodel import Field, SQLModel
 
-from sqlmodel_graphql import GraphQLHandler, mutation, query
-from sqlmodel_graphql.mcp.builders.schema_formatter import SchemaFormatter
+from sqlmodel_nexus import GraphQLHandler, mutation, query
+from sqlmodel_nexus.mcp.builders.schema_formatter import SchemaFormatter
 
 
 class TestEntity(SQLModel):

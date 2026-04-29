@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from sqlmodel_graphql.loader.factories import (
+from sqlmodel_nexus.loader.factories import (
     _build_loader_identity,
     _normalize_identifier,
     create_many_to_one_loader,

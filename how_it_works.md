@@ -1,6 +1,6 @@
-# SQLModel GraphQL 技术实现原理
+# SQLModel Nexus 技术实现原理
 
-本文档详细描述 sqlmodel-graphql 项目的转换逻辑和技术实现原理。
+本文档详细描述 sqlmodel-nexus 项目的转换逻辑和技术实现原理。
 
 ## 目录
 
@@ -16,7 +16,7 @@
 
 ## 项目概述
 
-sqlmodel-graphql 是一个为 SQLModel 提供 GraphQL 支持的库，主要功能：
+sqlmodel-nexus 是一个为 SQLModel 提供 GraphQL 支持的库，主要功能：
 
 - **SDL 生成**：从 SQLModel 类自动生成 GraphQL Schema Definition Language
 - **查询执行**：执行 GraphQL 查询并返回结果
@@ -481,7 +481,7 @@ SQLModel Entity         →     DefineSubset DTO
 
 ## 总结
 
-sqlmodel-graphql 通过以下核心技术实现 GraphQL 支持：
+sqlmodel-nexus 通过以下核心技术实现 GraphQL 支持：
 
 1. **装饰器标记**：使用 `@query`/`@mutation` 装饰器声明 GraphQL 操作
 2. **类型转换**：`TypeConverter` 统一处理 Python → GraphQL 类型映射

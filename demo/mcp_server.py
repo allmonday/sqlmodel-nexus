@@ -9,7 +9,7 @@ Usage:
 """
 
 from demo.models import BaseEntity
-from sqlmodel_graphql.mcp import create_mcp_server
+from sqlmodel_nexus.mcp import create_mcp_server
 
 
 def main() -> None:

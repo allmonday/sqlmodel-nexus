@@ -1,10 +1,10 @@
-# SQLModel GraphQL
+# SQLModel Nexus
 
 > From SQLModel to running GraphQL API, Core API DTOs, and MCP Server — with zero boilerplate.
 
-[![pypi](https://img.shields.io/pypi/v/sqlmodel-graphql.svg)](https://pypi.python.org/pypi/sqlmodel-graphql)
-[![PyPI Downloads](https://static.pepy.tech/badge/sqlmodel-graphql/month)](https://pepy.tech/projects/sqlmodel-graphql)
-![Python Versions](https://img.shields.io/pypi/pyversion/sqlmodel-graphql)
+[![pypi](https://img.shields.io/pypi/v/sqlmodel-nexus.svg)](https://pypi.python.org/pypi/sqlmodel-nexus)
+[![PyPI Downloads](https://static.pepy.tech/badge/sqlmodel-nexus/month)](https://pepy.tech/projects/sqlmodel-nexus)
+![Python Versions](https://img.shields.io/pypi/pyversion/sqlmodel-nexus)
 
 ## Read This README in Order
 
@@ -20,7 +20,7 @@ The concepts appear in this order on purpose:
 2. **Core API Mode** — DefineSubset DTOs for REST endpoints, progressing from implicit auto-loading to `resolve_*`, `post_*`, and cross-layer data flow
 3. **MCP Server** — expose the same models to AI assistants
 
-## What sqlmodel-graphql Gives You
+## What sqlmodel-nexus Gives You
 
 | Need | What you write | What the framework does |
 |------|----------------|-------------------------|
@@ -34,8 +34,8 @@ The concepts appear in this order on purpose:
 ## Install
 
 ```bash
-pip install sqlmodel-graphql
-pip install sqlmodel-graphql[fastmcp]  # with MCP support
+pip install sqlmodel-nexus
+pip install sqlmodel-nexus[fastmcp]  # with MCP support
 ```
 
 ---
@@ -51,7 +51,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from sqlmodel import SQLModel, Field, Relationship, select
-from sqlmodel_graphql import query, GraphQLHandler
+from sqlmodel_nexus import query, GraphQLHandler
 
 class User(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
@@ -137,7 +137,7 @@ handler = GraphQLHandler(base=SQLModel, session_factory=async_session, enable_pa
 Skip `@query` decorators entirely — let the framework generate `by_id` and `by_filter` for every entity:
 
 ```python
-from sqlmodel_graphql import GraphQLHandler, AutoQueryConfig
+from sqlmodel_nexus import GraphQLHandler, AutoQueryConfig
 
 handler = GraphQLHandler(
     base=SQLModel,
@@ -165,7 +165,7 @@ The simplest Core API case: select fields from SQLModel entities, declare relati
 
 ```python
 from sqlmodel import SQLModel
-from sqlmodel_graphql import DefineSubset, ErManager
+from sqlmodel_nexus import DefineSubset, ErManager
 
 class UserDTO(DefineSubset):
     __subset__ = (User, ("id", "name"))
@@ -203,7 +203,7 @@ This is the Core API equivalent of GraphQL's relationship resolution — same Da
 Use `resolve_*` when implicit auto-loading doesn't fit: the field name doesn't match a relationship, or you need custom logic.
 
 ```python
-from sqlmodel_graphql import Loader
+from sqlmodel_nexus import Loader
 
 class TaskDTO(DefineSubset):
     __subset__ = (Task, ("id", "title", "owner_id"))
@@ -274,7 +274,7 @@ Reach for these tools only when parent and child nodes need to coordinate.
 
 ```python
 from typing import Annotated
-from sqlmodel_graphql import ExposeAs, SendTo, Collector
+from sqlmodel_nexus import ExposeAs, SendTo, Collector
 
 class SprintDTO(DefineSubset):
     __subset__ = (Sprint, ("id", "name"))
@@ -303,7 +303,7 @@ Use this only when the shape of the tree matters:
 For relationships that aren't in the ORM (cross-service calls, computed edges), declare them on the entity:
 
 ```python
-from sqlmodel_graphql import Relationship
+from sqlmodel_nexus import Relationship
 
 async def tags_loader(task_ids: list[int]) -> list[list[Tag]]:
     """Batch load tags for multiple tasks."""
@@ -335,7 +335,7 @@ Expose your SQLModel APIs to AI assistants with one function call.
 ### Simple MCP Server
 
 ```python
-from sqlmodel_graphql.mcp import config_simple_mcp_server
+from sqlmodel_nexus.mcp import config_simple_mcp_server
 
 mcp = config_simple_mcp_server(base=SQLModel, name="My API")
 mcp.run()  # stdio mode
@@ -346,7 +346,7 @@ Tools: `get_schema()`, `graphql_query(query)`, `graphql_mutation(mutation)`.
 ### Multi-App MCP Server
 
 ```python
-from sqlmodel_graphql.mcp import create_mcp_server
+from sqlmodel_nexus.mcp import create_mcp_server
 
 mcp = create_mcp_server(
     apps=[
@@ -361,7 +361,7 @@ mcp.run()
 Tools include `list_apps()`, `list_queries(app_name)`, `get_query_schema(name, app_name)`, `graphql_query(query, app_name)`, etc.
 
 ```bash
-pip install sqlmodel-graphql[fastmcp]
+pip install sqlmodel-nexus[fastmcp]
 ```
 
 ---

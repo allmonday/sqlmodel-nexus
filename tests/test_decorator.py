@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from sqlmodel import SQLModel
 
-from sqlmodel_graphql.decorator import mutation, query
+from sqlmodel_nexus.decorator import mutation, query
 
 
 class TestQueryDecorator:

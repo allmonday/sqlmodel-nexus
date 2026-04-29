@@ -12,7 +12,7 @@ Level 5: Custom __relationships__ + implicit auto-load (TaskWithTags, SprintWith
 
 
 from demo.core_api.models import Sprint, Tag, Task, User
-from sqlmodel_graphql import Collector, DefineSubset, SubsetConfig
+from sqlmodel_nexus import Collector, DefineSubset, SubsetConfig
 
 # ──────────────────────────────────────────────────────────
 # Level 1: Basic DefineSubset — field selection + FK hiding

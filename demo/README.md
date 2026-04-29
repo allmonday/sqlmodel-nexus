@@ -1,6 +1,6 @@
-# SQLModel GraphQL Demo
+# SQLModel Nexus Demo
 
-This demo showcases the SQLModel GraphQL library with a GraphiQL interface.
+This demo showcases the SQLModel Nexus library with a GraphiQL interface.
 
 ## Running the Demo
 

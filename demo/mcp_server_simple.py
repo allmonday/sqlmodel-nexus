@@ -16,8 +16,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from sqlmodel import SQLModel
 
 from demo.database import async_session
-from sqlmodel_graphql import mutation, query
-from sqlmodel_graphql.mcp import config_simple_mcp_server
+from sqlmodel_nexus import mutation, query
+from sqlmodel_nexus.mcp import config_simple_mcp_server
 
 
 # Define base entity

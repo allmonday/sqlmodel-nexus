@@ -1,5 +1,5 @@
 [project]
-name = "sqlmodel-graphql"
+name = "sqlmodel-nexus"
 version = "1.0.0"
 description = "GraphQL SDL generation and query optimization for SQLModel"
 authors = [{ name = "tangkikodo", email = "allmonday@126.com" }]
@@ -45,15 +45,15 @@ fastmcp = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/allmonday/sqlmodel-graphql"
-Repository = "https://github.com/allmonday/sqlmodel-graphql"
+Homepage = "https://github.com/allmonday/sqlmodel-nexus"
+Repository = "https://github.com/allmonday/sqlmodel-nexus"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/sqlmodel_graphql"]
+packages = ["src/sqlmodel_nexus"]
 
 [tool.ruff]
 line-length = 100

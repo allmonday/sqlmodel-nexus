@@ -7,9 +7,9 @@ import inspect
 import pytest
 from sqlmodel import Field, SQLModel
 
-from sqlmodel_graphql import mutation, query
-from sqlmodel_graphql.mcp import config_simple_mcp_server
-from sqlmodel_graphql.mcp.managers.single_app_manager import SingleAppManager
+from sqlmodel_nexus import mutation, query
+from sqlmodel_nexus.mcp import config_simple_mcp_server
+from sqlmodel_nexus.mcp.managers.single_app_manager import SingleAppManager
 
 # Check if fastmcp module is available
 try:
@@ -300,7 +300,7 @@ class TestConfigSimpleMCPServer:
         """Test creating simple MCP server with defaults."""
         mcp = config_simple_mcp_server(base=SimpleMCPMockBaseEntity)
 
-        assert mcp.name == "SQLModel GraphQL API"
+        assert mcp.name == "SQLModel Nexus API"
 
     def test_config_simple_mcp_server_tools_registered(self) -> None:
         """Test that only 2 tools are registered by default (allow_mutation=False)."""

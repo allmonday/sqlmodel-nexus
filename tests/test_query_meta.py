@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from sqlmodel_graphql.loader.factories import (
+from sqlmodel_nexus.loader.factories import (
     _apply_load_only,
     _dedupe_fields,
     _get_default_fields,
     _get_effective_query_fields,
 )
-from sqlmodel_graphql.loader.query_meta import (
+from sqlmodel_nexus.loader.query_meta import (
     generate_query_meta_from_dto,
     generate_query_meta_from_selection,
     generate_type_key_from_dto,
@@ -18,7 +18,7 @@ from sqlmodel_graphql.loader.query_meta import (
     merge_query_meta,
     set_query_meta,
 )
-from sqlmodel_graphql.query_parser import FieldSelection
+from sqlmodel_nexus.query_parser import FieldSelection
 
 # ── DTO fixtures ──
 
@@ -294,7 +294,7 @@ class TestGenerateTypeKeyFromDto:
 
 class TestErManagerSplitMode:
     def test_split_creates_separate_instances(self):
-        from sqlmodel_graphql.loader.registry import ErManager
+        from sqlmodel_nexus.loader.registry import ErManager
         from tests.conftest import FixtureTask, FixtureUser
 
         registry = ErManager(
@@ -315,7 +315,7 @@ class TestErManagerSplitMode:
         assert inst1 is not inst2
 
     def test_split_same_type_key_shares_instance(self):
-        from sqlmodel_graphql.loader.registry import ErManager
+        from sqlmodel_nexus.loader.registry import ErManager
         from tests.conftest import FixtureTask, FixtureUser
 
         registry = ErManager(
@@ -334,7 +334,7 @@ class TestErManagerSplitMode:
         assert inst1 is inst2
 
     def test_default_mode_ignores_type_key(self):
-        from sqlmodel_graphql.loader.registry import ErManager
+        from sqlmodel_nexus.loader.registry import ErManager
         from tests.conftest import FixtureTask, FixtureUser
 
         registry = ErManager(
@@ -355,7 +355,7 @@ class TestErManagerSplitMode:
         assert inst1 is inst2
 
     def test_clear_cache_resets_split_instances(self):
-        from sqlmodel_graphql.loader.registry import ErManager
+        from sqlmodel_nexus.loader.registry import ErManager
         from tests.conftest import FixtureTask, FixtureUser
 
         registry = ErManager(

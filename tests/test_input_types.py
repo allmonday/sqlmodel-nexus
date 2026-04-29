@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from sqlmodel import Field, SQLModel
 
-from sqlmodel_graphql import GraphQLHandler, mutation
-from sqlmodel_graphql.mcp.builders.schema_formatter import SchemaFormatter
+from sqlmodel_nexus import GraphQLHandler, mutation
+from sqlmodel_nexus.mcp.builders.schema_formatter import SchemaFormatter
 
 
 # Define base class for test entities

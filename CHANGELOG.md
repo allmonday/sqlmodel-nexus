@@ -4,9 +4,9 @@
 
 ### New Public API: Core API Mode
 
-sqlmodel-graphql now provides a complete Core API mode alongside GraphQL, enabling DTO-first response assembly for REST endpoints and service layers.
+sqlmodel-nexus now provides a complete Core API mode alongside GraphQL, enabling DTO-first response assembly for REST endpoints and service layers.
 
-**New exports from `sqlmodel_graphql`:**
+**New exports from `sqlmodel_nexus`:**
 
 | Export | Purpose |
 |--------|---------|
@@ -20,7 +20,7 @@ sqlmodel-graphql now provides a complete Core API mode alongside GraphQL, enabli
 
 ```python
 from sqlmodel import SQLModel
-from sqlmodel_graphql import DefineSubset, ErManager, Loader
+from sqlmodel_nexus import DefineSubset, ErManager, Loader
 
 er = ErManager(base=SQLModel, session_factory=async_session)
 Resolver = er.create_resolver()
@@ -54,12 +54,12 @@ The 0.14.0 Core API exports were not yet part of a stable release. If you used t
 
 ```python
 # Before (0.14.0 feature branch)
-from sqlmodel_graphql import LoaderRegistry, Resolver, AutoLoad
+from sqlmodel_nexus import LoaderRegistry, Resolver, AutoLoad
 registry = LoaderRegistry(entities=[User, Task], session_factory=sf)
 result = await Resolver(registry).resolve(dtos)
 
 # After (1.0.0)
-from sqlmodel_graphql import ErManager
+from sqlmodel_nexus import ErManager
 er = ErManager(base=SQLModel, session_factory=sf)
 Resolver = er.create_resolver()
 result = await Resolver().resolve(dtos)

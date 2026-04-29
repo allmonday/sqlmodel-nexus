@@ -12,7 +12,7 @@ For the Core API models (Sprint/Task/User), see:
 """
 
 from demo.models import Comment, Post, User
-from sqlmodel_graphql import ErDiagram
+from sqlmodel_nexus import ErDiagram
 
 
 def main():

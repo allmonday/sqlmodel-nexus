@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from sqlmodel_graphql.mcp.types.errors import (
+from sqlmodel_nexus.mcp.types.errors import (
     MCPError,
     MCPErrors,
     create_error_response,
@@ -71,9 +71,9 @@ class TestSchemaFormatter:
 
         from sqlmodel import Field, SQLModel
 
-        from sqlmodel_graphql import query
-        from sqlmodel_graphql.handler import GraphQLHandler
-        from sqlmodel_graphql.mcp.builders.schema_formatter import SchemaFormatter
+        from sqlmodel_nexus import query
+        from sqlmodel_nexus.handler import GraphQLHandler
+        from sqlmodel_nexus.mcp.builders.schema_formatter import SchemaFormatter
 
         # Define test base and entity
         class TestBase(SQLModel):
@@ -112,9 +112,9 @@ class TestSchemaFormatter:
         """Test that types have scalar fields."""
         from sqlmodel import Field, SQLModel
 
-        from sqlmodel_graphql import query
-        from sqlmodel_graphql.handler import GraphQLHandler
-        from sqlmodel_graphql.mcp.builders.schema_formatter import SchemaFormatter
+        from sqlmodel_nexus import query
+        from sqlmodel_nexus.handler import GraphQLHandler
+        from sqlmodel_nexus.mcp.builders.schema_formatter import SchemaFormatter
 
         class TestBase(SQLModel):
             pass
@@ -147,9 +147,9 @@ class TestSchemaFormatter:
 
         from sqlmodel import Field, SQLModel
 
-        from sqlmodel_graphql import query
-        from sqlmodel_graphql.handler import GraphQLHandler
-        from sqlmodel_graphql.mcp.builders.schema_formatter import SchemaFormatter
+        from sqlmodel_nexus import query
+        from sqlmodel_nexus.handler import GraphQLHandler
+        from sqlmodel_nexus.mcp.builders.schema_formatter import SchemaFormatter
 
         class TestBase(SQLModel):
             pass
@@ -190,8 +190,8 @@ class TestMCPServerCreation:
         """Test that MCP server can be created with test entities."""
         from sqlmodel import Field, SQLModel
 
-        from sqlmodel_graphql import query
-        from sqlmodel_graphql.mcp import create_mcp_server
+        from sqlmodel_nexus import query
+        from sqlmodel_nexus.mcp import create_mcp_server
 
         class TestBase(SQLModel):
             pass
@@ -228,9 +228,9 @@ class TestListOperations:
         """Test that list_queries returns names and descriptions."""
         from sqlmodel import Field, SQLModel
 
-        from sqlmodel_graphql import query
-        from sqlmodel_graphql.handler import GraphQLHandler
-        from sqlmodel_graphql.mcp.builders.type_tracer import TypeTracer
+        from sqlmodel_nexus import query
+        from sqlmodel_nexus.handler import GraphQLHandler
+        from sqlmodel_nexus.mcp.builders.type_tracer import TypeTracer
 
         class TestBase(SQLModel):
             pass
@@ -260,8 +260,8 @@ class TestListOperations:
         """Test that list_queries returns empty list when no queries."""
         from sqlmodel import SQLModel
 
-        from sqlmodel_graphql.handler import GraphQLHandler
-        from sqlmodel_graphql.mcp.builders.type_tracer import TypeTracer
+        from sqlmodel_nexus.handler import GraphQLHandler
+        from sqlmodel_nexus.mcp.builders.type_tracer import TypeTracer
 
         class TestBase(SQLModel):
             pass
@@ -279,9 +279,9 @@ class TestListOperations:
         """Test that list_mutations returns names and descriptions."""
         from sqlmodel import Field, SQLModel
 
-        from sqlmodel_graphql import mutation
-        from sqlmodel_graphql.handler import GraphQLHandler
-        from sqlmodel_graphql.mcp.builders.type_tracer import TypeTracer
+        from sqlmodel_nexus import mutation
+        from sqlmodel_nexus.handler import GraphQLHandler
+        from sqlmodel_nexus.mcp.builders.type_tracer import TypeTracer
 
         class TestBase(SQLModel):
             pass
@@ -314,9 +314,9 @@ class TestGetOperationSchema:
         """Test that get_query_schema returns operation info."""
         from sqlmodel import Field, SQLModel
 
-        from sqlmodel_graphql import query
-        from sqlmodel_graphql.handler import GraphQLHandler
-        from sqlmodel_graphql.mcp.builders.type_tracer import TypeTracer
+        from sqlmodel_nexus import query
+        from sqlmodel_nexus.handler import GraphQLHandler
+        from sqlmodel_nexus.mcp.builders.type_tracer import TypeTracer
 
         class TestBase(SQLModel):
             pass
@@ -348,7 +348,7 @@ class TestGetOperationSchema:
         # This test uses manually constructed introspection data to avoid
         # Python's forward reference issues when classes are defined inside methods.
         # See test_type_tracer.py for comprehensive tests of type tracing.
-        from sqlmodel_graphql.mcp.builders.type_tracer import TypeTracer
+        from sqlmodel_nexus.mcp.builders.type_tracer import TypeTracer
 
         introspection = {
             "types": [
@@ -438,8 +438,8 @@ class TestGetOperationSchema:
         """Test that get_query_schema returns None for nonexistent query."""
         from sqlmodel import SQLModel
 
-        from sqlmodel_graphql.handler import GraphQLHandler
-        from sqlmodel_graphql.mcp.builders.type_tracer import TypeTracer
+        from sqlmodel_nexus.handler import GraphQLHandler
+        from sqlmodel_nexus.mcp.builders.type_tracer import TypeTracer
 
         class TestBase(SQLModel):
             pass
@@ -457,9 +457,9 @@ class TestGetOperationSchema:
         """Test that get_mutation_schema returns operation info."""
         from sqlmodel import Field, SQLModel
 
-        from sqlmodel_graphql import mutation
-        from sqlmodel_graphql.handler import GraphQLHandler
-        from sqlmodel_graphql.mcp.builders.type_tracer import TypeTracer
+        from sqlmodel_nexus import mutation
+        from sqlmodel_nexus.handler import GraphQLHandler
+        from sqlmodel_nexus.mcp.builders.type_tracer import TypeTracer
 
         class TestBase(SQLModel):
             pass
@@ -487,9 +487,9 @@ class TestGetOperationSchema:
         """Test operation with no arguments."""
         from sqlmodel import Field, SQLModel
 
-        from sqlmodel_graphql import query
-        from sqlmodel_graphql.handler import GraphQLHandler
-        from sqlmodel_graphql.mcp.builders.type_tracer import TypeTracer
+        from sqlmodel_nexus import query
+        from sqlmodel_nexus.handler import GraphQLHandler
+        from sqlmodel_nexus.mcp.builders.type_tracer import TypeTracer
 
         class TestBase(SQLModel):
             pass
@@ -521,9 +521,9 @@ class TestThreeLayerProgressiveDisclosure:
         """Test full workflow from list to schema."""
         from sqlmodel import Field, SQLModel
 
-        from sqlmodel_graphql import query
-        from sqlmodel_graphql.handler import GraphQLHandler
-        from sqlmodel_graphql.mcp.builders.type_tracer import TypeTracer
+        from sqlmodel_nexus import query
+        from sqlmodel_nexus.handler import GraphQLHandler
+        from sqlmodel_nexus.mcp.builders.type_tracer import TypeTracer
 
         class TestBase(SQLModel):
             pass

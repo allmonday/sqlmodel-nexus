@@ -5,7 +5,7 @@ from typing import Optional
 from pydantic import BaseModel
 from sqlmodel import Field, Relationship, SQLModel
 
-from sqlmodel_graphql.response_builder import (
+from sqlmodel_nexus.response_builder import (
     build_response_model,
     get_relation_entity,
     get_relationship_names,

@@ -16,7 +16,7 @@ which application to use.
 
 import asyncio
 
-from sqlmodel_graphql.mcp import create_mcp_server
+from sqlmodel_nexus.mcp import create_mcp_server
 
 from .models import BlogBaseEntity, ShopBaseEntity
 

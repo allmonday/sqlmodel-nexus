@@ -2,7 +2,7 @@
 
 from demo.database import async_session
 from demo.models import BaseEntity
-from sqlmodel_graphql import AutoQueryConfig, GraphQLHandler
+from sqlmodel_nexus import AutoQueryConfig, GraphQLHandler
 
 config = AutoQueryConfig(
     session_factory=async_session,

@@ -25,7 +25,7 @@ Authentication:
 from auth_demo.auth import MCPAuthMiddleware
 from auth_demo.database import init_db
 from auth_demo.models import BaseEntity
-from sqlmodel_graphql.mcp import create_mcp_server
+from sqlmodel_nexus.mcp import create_mcp_server
 
 
 async def lifespan(app):

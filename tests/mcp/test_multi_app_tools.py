@@ -3,12 +3,12 @@
 import pytest
 from sqlmodel import Field, SQLModel
 
-from sqlmodel_graphql import mutation, query
+from sqlmodel_nexus import mutation, query
 
 # Skip all tests in this module if fastmcp is not installed
 pytest.importorskip("fastmcp")
 
-from sqlmodel_graphql.mcp import create_mcp_server  # noqa: E402
+from sqlmodel_nexus.mcp import create_mcp_server  # noqa: E402
 
 
 def _get_tools_dict(mcp):

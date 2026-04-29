@@ -5,7 +5,7 @@ from typing import Optional
 import pytest
 from sqlmodel import Field, Relationship, SQLModel
 
-from sqlmodel_graphql.er_diagram import ErDiagram, RelationType
+from sqlmodel_nexus.er_diagram import ErDiagram, RelationType
 from tests.conftest import FixtureSprint, FixtureTask, FixtureUser
 
 # ──────────────────────────────────────────────────────────

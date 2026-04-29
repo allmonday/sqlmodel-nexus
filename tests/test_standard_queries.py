@@ -6,7 +6,7 @@ import pytest
 from pydantic import BaseModel
 from sqlmodel import Field, SQLModel
 
-from sqlmodel_graphql import AutoQueryConfig, GraphQLHandler, add_standard_queries, query
+from sqlmodel_nexus import AutoQueryConfig, GraphQLHandler, add_standard_queries, query
 
 
 class ExplicitSearchFilter(BaseModel):

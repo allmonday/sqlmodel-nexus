@@ -3,7 +3,7 @@
 
 from sqlmodel import Field, SQLModel
 
-from sqlmodel_graphql.utils.type_utils import (
+from sqlmodel_nexus.utils.type_utils import (
     get_field_type,
     get_return_entity_type,
 )

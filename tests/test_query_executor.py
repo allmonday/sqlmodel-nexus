@@ -5,10 +5,10 @@ from __future__ import annotations
 import pytest
 from sqlmodel import SQLModel, select
 
-from sqlmodel_graphql.decorator import mutation, query
-from sqlmodel_graphql.execution.query_executor import QueryExecutor
-from sqlmodel_graphql.loader.registry import ErManager, RelationshipInfo
-from sqlmodel_graphql.query_parser import FieldSelection, QueryParser
+from sqlmodel_nexus.decorator import mutation, query
+from sqlmodel_nexus.execution.query_executor import QueryExecutor
+from sqlmodel_nexus.loader.registry import ErManager, RelationshipInfo
+from sqlmodel_nexus.query_parser import FieldSelection, QueryParser
 from tests.conftest import (
     FixtureSprint,
     FixtureTask,

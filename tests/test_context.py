@@ -6,8 +6,8 @@ from typing import Annotated
 
 from pydantic import BaseModel
 
-from sqlmodel_graphql.context import Collector, ExposeAs, SendTo
-from sqlmodel_graphql.resolver import Resolver
+from sqlmodel_nexus.context import Collector, ExposeAs, SendTo
+from sqlmodel_nexus.resolver import Resolver
 
 # ──────────────────────────────────────────────────────────
 # Test: ExposeAs — ancestor context passing

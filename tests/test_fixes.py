@@ -8,15 +8,15 @@ import pytest
 from pydantic import BaseModel
 from sqlmodel import Field, SQLModel
 
-from sqlmodel_graphql.context import (
+from sqlmodel_nexus.context import (
     _expose_cache,
     _send_to_cache,
     scan_expose_fields,
     scan_send_to_fields,
 )
-from sqlmodel_graphql.loader.registry import ErManager, _extract_sort_field
-from sqlmodel_graphql.relationship import Relationship
-from sqlmodel_graphql.resolver import Loader, Resolver, _class_meta_cache, _get_class_meta
+from sqlmodel_nexus.loader.registry import ErManager, _extract_sort_field
+from sqlmodel_nexus.relationship import Relationship
+from sqlmodel_nexus.resolver import Loader, Resolver, _class_meta_cache, _get_class_meta
 
 # ──────────────────────────────────────────────────────────
 # Issue 1+2: Resolver metadata caching
@@ -113,7 +113,7 @@ class TestContextScanCaching:
         """scan_expose_fields should cache results per class."""
         from typing import Annotated
 
-        from sqlmodel_graphql.context import ExposeAs
+        from sqlmodel_nexus.context import ExposeAs
 
         class ExposedModel(BaseModel):
             name: Annotated[str, ExposeAs("user_name")]
@@ -130,7 +130,7 @@ class TestContextScanCaching:
         """scan_send_to_fields should cache results per class."""
         from typing import Annotated
 
-        from sqlmodel_graphql.context import SendTo
+        from sqlmodel_nexus.context import SendTo
 
         class CollectedModel(BaseModel):
             owner: Annotated[str | None, SendTo("contributors")] = None
@@ -249,7 +249,7 @@ class TestGetLoaderByNameAmbiguity:
             session_factory=session_factory,
         )
 
-        with caplog.at_level(logging.WARNING, logger="sqlmodel_graphql.loader.registry"):
+        with caplog.at_level(logging.WARNING, logger="sqlmodel_nexus.loader.registry"):
             loader = registry.get_loader_by_name("items")
 
         assert loader is not None
@@ -275,7 +275,7 @@ class TestGetLoaderByNameAmbiguity:
             session_factory=session_factory,
         )
 
-        with caplog.at_level(logging.WARNING, logger="sqlmodel_graphql.loader.registry"):
+        with caplog.at_level(logging.WARNING, logger="sqlmodel_nexus.loader.registry"):
             loader = registry.get_loader_by_name("unique_rel")
 
         assert loader is not None
@@ -290,8 +290,8 @@ class TestGetLoaderByNameAmbiguity:
 class TestQueryMetaFKLookup:
     def test_fk_lookup_overrides_convention(self):
         """fk_lookup should use actual FK name instead of {rel}_id."""
-        from sqlmodel_graphql.loader.query_meta import generate_query_meta_from_selection
-        from sqlmodel_graphql.query_parser import FieldSelection
+        from sqlmodel_nexus.loader.query_meta import generate_query_meta_from_selection
+        from sqlmodel_nexus.query_parser import FieldSelection
 
         class MyEntity(SQLModel, table=True):
             __tablename__ = "fk_lookup_entity"
@@ -323,8 +323,8 @@ class TestQueryMetaFKLookup:
 
     def test_fk_lookup_none_falls_back(self):
         """When fk_lookup is None, should fall back to {rel}_id convention."""
-        from sqlmodel_graphql.loader.query_meta import generate_query_meta_from_selection
-        from sqlmodel_graphql.query_parser import FieldSelection
+        from sqlmodel_nexus.loader.query_meta import generate_query_meta_from_selection
+        from sqlmodel_nexus.query_parser import FieldSelection
 
         class ConventionEntity(SQLModel, table=True):
             __tablename__ = "convention_entity"
@@ -348,8 +348,8 @@ class TestQueryMetaFKLookup:
 
     def test_type_key_with_fk_lookup(self):
         """generate_type_key_from_selection should also use fk_lookup."""
-        from sqlmodel_graphql.loader.query_meta import generate_type_key_from_selection
-        from sqlmodel_graphql.query_parser import FieldSelection
+        from sqlmodel_nexus.loader.query_meta import generate_type_key_from_selection
+        from sqlmodel_nexus.query_parser import FieldSelection
 
         class TypeKeyEntity(SQLModel, table=True):
             __tablename__ = "type_key_entity"
@@ -387,7 +387,7 @@ class TestQueryMetaFKLookup:
 class TestLoaderFactoryClosures:
     def test_closure_captures_correct_values(self):
         """Factory-created loaders should capture closure variables correctly."""
-        from sqlmodel_graphql.loader.factories import create_many_to_one_loader
+        from sqlmodel_nexus.loader.factories import create_many_to_one_loader
 
         class FakeTarget(SQLModel, table=True):
             __tablename__ = "closure_target"
@@ -411,7 +411,7 @@ class TestLoaderFactoryClosures:
 
     def test_multiple_loaders_independent(self):
         """Multiple loaders created by same factory should be independent."""
-        from sqlmodel_graphql.loader.factories import create_one_to_many_loader
+        from sqlmodel_nexus.loader.factories import create_one_to_many_loader
 
         class Target1(SQLModel, table=True):
             __tablename__ = "closure_target_1"

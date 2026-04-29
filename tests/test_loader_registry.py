@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from sqlmodel import Field, SQLModel
 
-from sqlmodel_graphql.loader.registry import ErManager
-from sqlmodel_graphql.relationship import Relationship
+from sqlmodel_nexus.loader.registry import ErManager
+from sqlmodel_nexus.relationship import Relationship
 from tests.conftest import FixtureSprint, FixtureTask, FixtureUser, get_test_session_factory
 
 # ──────────────────────────────────────────────────────────

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from graphql import parse
 
-from sqlmodel_graphql.execution.field_tree_builder import FieldTreeBuilder
+from sqlmodel_nexus.execution.field_tree_builder import FieldTreeBuilder
 
 
 def _get_field_node(query: str, field_name: str):

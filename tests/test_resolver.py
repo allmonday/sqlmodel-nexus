@@ -8,9 +8,9 @@ import pytest
 from pydantic import BaseModel
 from sqlmodel import select
 
-from sqlmodel_graphql.loader.registry import ErManager
-from sqlmodel_graphql.resolver import Loader, Resolver
-from sqlmodel_graphql.subset import DefineSubset
+from sqlmodel_nexus.loader.registry import ErManager
+from sqlmodel_nexus.resolver import Loader, Resolver
+from sqlmodel_nexus.subset import DefineSubset
 from tests.conftest import (
     FixtureSprint,
     FixtureTask,

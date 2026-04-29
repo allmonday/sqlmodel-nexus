@@ -11,7 +11,7 @@ from typing import Optional
 
 from sqlmodel import Field, Relationship, SQLModel, select
 
-from sqlmodel_graphql import mutation, query
+from sqlmodel_nexus import mutation, query
 
 # =============================================================================
 # Blog Application Models
