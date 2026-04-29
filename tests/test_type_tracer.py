@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from sqlmodel_graphql.mcp.builders.type_tracer import TypeTracer
+from sqlmodel_nexus.mcp.builders.type_tracer import TypeTracer
 
 
 class TestTypeTracer:

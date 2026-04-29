@@ -3,8 +3,8 @@
 import pytest
 from sqlmodel import Field, SQLModel
 
-from sqlmodel_graphql.mcp.managers import AppResources, MultiAppManager
-from sqlmodel_graphql.mcp.types.app_config import AppConfig
+from sqlmodel_nexus.mcp.managers import AppResources, MultiAppManager
+from sqlmodel_nexus.mcp.types.app_config import AppConfig
 
 
 # Mock models for testing (not test classes)

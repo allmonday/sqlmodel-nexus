@@ -21,7 +21,7 @@ For lightweight single-app applications, this pattern adds unnecessary complexit
 ```python
 def create_simple_mcp_server(
     base: type,
-    name: str = "SQLModel GraphQL API",
+    name: str = "SQLModel Nexus API",
     description: str = "GraphQL API for SQLModel entities",
 ) -> FastMCP:
     """Create a simplified MCP server for single-app scenarios.
@@ -42,7 +42,7 @@ def create_simple_mcp_server(
 ### Usage Example
 
 ```python
-from sqlmodel_graphql.mcp import create_simple_mcp_server
+from sqlmodel_nexus.mcp import create_simple_mcp_server
 from myapp.models import BaseEntity
 
 mcp = create_simple_mcp_server(
@@ -101,7 +101,7 @@ async def execute_mutation(mutation: str) -> dict:
 ## File Structure
 
 ```
-src/sqlmodel_graphql/mcp/
+src/sqlmodel_nexus/mcp/
 ├── __init__.py              # Export create_simple_mcp_server
 ├── server.py                # create_mcp_server (existing)
 ├── simple_server.py         # create_simple_mcp_server (new)
@@ -119,7 +119,7 @@ src/sqlmodel_graphql/mcp/
 
 ## API Export
 
-Update `src/sqlmodel_graphql/mcp/__init__.py`:
+Update `src/sqlmodel_nexus/mcp/__init__.py`:
 
 ```python
 __all__ = [
@@ -130,8 +130,8 @@ __all__ = [
     "AppResources",
 ]
 
-from sqlmodel_graphql.mcp.server import create_mcp_server
-from sqlmodel_graphql.mcp.simple_server import create_simple_mcp_server  # New
+from sqlmodel_nexus.mcp.server import create_mcp_server
+from sqlmodel_nexus.mcp.simple_server import create_simple_mcp_server  # New
 ```
 
 ## Comparison

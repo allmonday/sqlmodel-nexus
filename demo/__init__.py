@@ -1,1 +1,1 @@
-"""SQLModel GraphQL Demo application."""
+"""SQLModel Nexus Demo application."""

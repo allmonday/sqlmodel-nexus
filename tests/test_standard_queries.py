@@ -6,7 +6,7 @@ import pytest
 from pydantic import BaseModel
 from sqlmodel import Field, SQLModel
 
-from sqlmodel_graphql import AutoQueryConfig, GraphQLHandler, add_standard_queries, query
+from sqlmodel_nexus import AutoQueryConfig, GraphQLHandler, add_standard_queries, query
 
 
 class ExplicitSearchFilter(BaseModel):
@@ -243,6 +243,34 @@ async def test_by_id_uses_actual_primary_key_name_and_type():
     assert "productById(code: String!)" in sdl
 
     result = await handler.execute('{ productById(code: "sku-1") { code name } }')
+
+    assert "errors" not in result
+    where_clause = str(state["stmt"].whereclause)
+    assert "code" in where_clause
+
+
+@pytest.mark.asyncio
+async def test_by_id_ignores_non_primary_id_field():
+    """A non-primary id field should not block real primary key discovery."""
+
+    class TestBase7B(SQLModel):
+        pass
+
+    class CatalogItem(TestBase7B, table=True):
+        id: int | None = None
+        code: str = Field(primary_key=True)
+        name: str
+
+    state: dict[str, object] = {}
+    handler = GraphQLHandler(
+        base=TestBase7B,
+        auto_query_config=AutoQueryConfig(session_factory=_session_factory(state)),
+    )
+    sdl = handler.get_sdl()
+
+    assert "catalogItemById(code: String!)" in sdl
+
+    result = await handler.execute('{ catalogItemById(code: "sku-2") { code name } }')
 
     assert "errors" not in result
     where_clause = str(state["stmt"].whereclause)

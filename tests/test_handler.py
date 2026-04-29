@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from sqlmodel import Field, Relationship, SQLModel
 
-from sqlmodel_graphql import GraphQLHandler, mutation, query
+from sqlmodel_nexus import GraphQLHandler, mutation, query
 
 
 # Define test base class
@@ -146,6 +146,34 @@ class TestGraphQLHandlerWithBase:
 
         assert "data" in result
         assert result["data"]["__schema"]["queryType"]["name"] == "Query"
+
+    @pytest.mark.asyncio
+    async def test_type_introspection_query(self, handler: GraphQLHandler) -> None:
+        """Test __type introspection query."""
+        result = await handler.execute('{ __type(name: "HandlerTestUser") { name kind } }')
+
+        assert "data" in result
+        assert result["data"]["__type"]["name"] == "HandlerTestUser"
+        assert result["data"]["__type"]["kind"] == "OBJECT"
+
+    @pytest.mark.asyncio
+    async def test_mixed_query_with_introspection(self, handler: GraphQLHandler) -> None:
+        """Normal query fields should coexist with introspection fields."""
+        result = await handler.execute(
+            "{ handlerTestUserGetAll { id } __schema { queryType { name } } }"
+        )
+
+        assert "data" in result
+        assert "handlerTestUserGetAll" in result["data"]
+        assert result["data"]["__schema"]["queryType"]["name"] == "Query"
+
+    @pytest.mark.asyncio
+    async def test_rejects_aliases(self, handler: GraphQLHandler) -> None:
+        """Aliases should fail fast with an explicit error."""
+        result = await handler.execute("{ handlerTestUserGetAll { userId: id } }")
+
+        assert "errors" in result
+        assert any("aliases are not supported" in error["message"] for error in result["errors"])
 
 
 # ============================================================================

@@ -4,11 +4,17 @@ from __future__ import annotations
 
 from sqlmodel import Field, SQLModel
 
-from sqlmodel_graphql import GraphQLHandler, mutation, query
-from sqlmodel_graphql.mcp.builders.schema_formatter import SchemaFormatter
+from sqlmodel_nexus import GraphQLHandler, mutation, query
+from sqlmodel_nexus.mcp.builders.schema_formatter import SchemaFormatter
 
 
-class TestEntity(SQLModel):
+class SchemaTestBase(SQLModel):
+    """Dedicated base class for schema tests to avoid cross-test contamination."""
+
+    __test__ = False
+
+
+class TestEntity(SchemaTestBase):
     """Test entity with descriptions."""
 
     __test__ = False  # Tell pytest this is not a test class
@@ -38,7 +44,7 @@ class TestFieldDescriptions:
 
     def test_field_description_extracted(self) -> None:
         """Field(description="...") should be extracted."""
-        handler = GraphQLHandler(base=SQLModel)
+        handler = GraphQLHandler(base=SchemaTestBase)
         handler.entities = [TestEntity]
         formatter = SchemaFormatter(handler)
         schema = formatter.get_schema_info()
@@ -56,7 +62,7 @@ class TestFieldDescriptions:
 
     def test_field_without_description_is_none(self) -> None:
         """Fields without description should have None."""
-        handler = GraphQLHandler(base=SQLModel)
+        handler = GraphQLHandler(base=SchemaTestBase)
         handler.entities = [TestEntity]
         formatter = SchemaFormatter(handler)
         schema = formatter.get_schema_info()
@@ -78,7 +84,7 @@ class TestMethodDocstrings:
 
     def test_docstring_used_as_description(self) -> None:
         """Docstring should be used as description."""
-        handler = GraphQLHandler(base=SQLModel)
+        handler = GraphQLHandler(base=SchemaTestBase)
         handler.entities = [TestEntity]
         formatter = SchemaFormatter(handler)
         schema = formatter.get_schema_info()
@@ -92,7 +98,7 @@ class TestMethodDocstrings:
 
     def test_docstring_used_for_get_by_id(self) -> None:
         """Docstring should be used for get_by_id."""
-        handler = GraphQLHandler(base=SQLModel)
+        handler = GraphQLHandler(base=SchemaTestBase)
         handler.entities = [TestEntity]
         formatter = SchemaFormatter(handler)
         schema = formatter.get_schema_info()
@@ -110,7 +116,7 @@ class TestArgumentDefaults:
 
     def test_default_value_extracted(self) -> None:
         """Argument default value should be extracted."""
-        handler = GraphQLHandler(base=SQLModel)
+        handler = GraphQLHandler(base=SchemaTestBase)
         handler.entities = [TestEntity]
         formatter = SchemaFormatter(handler)
         schema = formatter.get_schema_info()
@@ -129,7 +135,7 @@ class TestArgumentDefaults:
 
     def test_required_argument_no_default(self) -> None:
         """Required arguments should have no default value."""
-        handler = GraphQLHandler(base=SQLModel)
+        handler = GraphQLHandler(base=SchemaTestBase)
         handler.entities = [TestEntity]
         formatter = SchemaFormatter(handler)
         schema = formatter.get_schema_info()

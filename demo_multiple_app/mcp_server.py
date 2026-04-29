@@ -16,7 +16,7 @@ which application to use.
 
 import asyncio
 
-from sqlmodel_graphql.mcp import create_mcp_server
+from sqlmodel_nexus.mcp import create_mcp_server
 
 from .models import BlogBaseEntity, ShopBaseEntity
 
@@ -76,7 +76,8 @@ def main():
     print("=" * 60 + "\n")
 
     # Run the server (mcp.run() handles its own event loop)
-    mcp.run(transport="streamable-http")
+    port = int(__import__("os").environ.get("PORT", 8004))
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
 
 
 if __name__ == "__main__":

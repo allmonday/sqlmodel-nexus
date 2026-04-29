@@ -6,7 +6,7 @@ from demo.database import async_session
 
 # Import demo models
 from demo.models import BaseEntity, Comment, Post, User
-from sqlmodel_graphql import AutoQueryConfig, GraphQLHandler, add_standard_queries
+from sqlmodel_nexus import AutoQueryConfig, GraphQLHandler, add_standard_queries
 
 
 def test_demo_with_standard_queries():

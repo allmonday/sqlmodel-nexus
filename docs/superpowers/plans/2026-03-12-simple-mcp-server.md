@@ -14,9 +14,9 @@
 
 | File | Action | Purpose |
 |------|--------|---------|
-| `src/sqlmodel_graphql/mcp/tools/simple_tools.py` | Create | 3 simplified MCP tools |
-| `src/sqlmodel_graphql/mcp/simple_server.py` | Create | `create_simple_mcp_server` function |
-| `src/sqlmodel_graphql/mcp/__init__.py` | Modify | Export `create_simple_mcp_server` |
+| `src/sqlmodel_nexus/mcp/tools/simple_tools.py` | Create | 3 simplified MCP tools |
+| `src/sqlmodel_nexus/mcp/simple_server.py` | Create | `create_simple_mcp_server` function |
+| `src/sqlmodel_nexus/mcp/__init__.py` | Modify | Export `create_simple_mcp_server` |
 | `tests/test_mcp.py` | Modify | Add tests for simple server |
 
 ---
@@ -26,7 +26,7 @@
 ### Task 1: Create simple_tools.py with get_schema tool
 
 **Files:**
-- Create: `src/sqlmodel_graphql/mcp/tools/simple_tools.py`
+- Create: `src/sqlmodel_nexus/mcp/tools/simple_tools.py`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -41,8 +41,8 @@ class TestSimpleMCPServer:
         """Test that simple server get_schema returns SDL."""
         from sqlmodel import Field, SQLModel
 
-        from sqlmodel_graphql import query
-        from sqlmodel_graphql.mcp import create_simple_mcp_server
+        from sqlmodel_nexus import query
+        from sqlmodel_nexus.mcp import create_simple_mcp_server
 
         class TestBase(SQLModel):
             pass
@@ -76,7 +76,7 @@ Expected: FAIL (module not found or function not defined)
 - [ ] **Step 3: Create simple_tools.py with register_simple_tools function**
 
 ```python
-# src/sqlmodel_graphql/mcp/tools/simple_tools.py
+# src/sqlmodel_nexus/mcp/tools/simple_tools.py
 """Simple MCP tools for single-app scenarios.
 
 This module provides 3 simplified tools without progressive disclosure:
@@ -89,7 +89,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from sqlmodel_graphql.mcp.types.errors import (
+from sqlmodel_nexus.mcp.types.errors import (
     MCPErrors,
     create_error_response,
     create_success_response,
@@ -98,7 +98,7 @@ from sqlmodel_graphql.mcp.types.errors import (
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
 
-    from sqlmodel_graphql.mcp.managers.app_resources import AppResources
+    from sqlmodel_nexus.mcp.managers.app_resources import AppResources
 
 
 def register_simple_tools(
@@ -217,12 +217,12 @@ Expected: FAIL (ImportError or function not defined)
 ### Task 2: Create simple_server.py
 
 **Files:**
-- Create: `src/sqlmodel_graphql/mcp/simple_server.py`
+- Create: `src/sqlmodel_nexus/mcp/simple_server.py`
 
 - [ ] **Step 1: Create simple_server.py**
 
 ```python
-# src/sqlmodel_graphql/mcp/simple_server.py
+# src/sqlmodel_nexus/mcp/simple_server.py
 """Simple MCP Server for single-app scenarios.
 
 Provides a FastMCP server with 3 simplified tools for lightweight applications.
@@ -232,10 +232,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlmodel_graphql.handler import GraphQLHandler
-from sqlmodel_graphql.mcp.builders.type_tracer import TypeTracer
-from sqlmodel_graphql.mcp.managers.app_resources import AppResources
-from sqlmodel_graphql.mcp.tools.simple_tools import register_simple_tools
+from sqlmodel_nexus.handler import GraphQLHandler
+from sqlmodel_nexus.mcp.builders.type_tracer import TypeTracer
+from sqlmodel_nexus.mcp.managers.app_resources import AppResources
+from sqlmodel_nexus.mcp.tools.simple_tools import register_simple_tools
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -243,7 +243,7 @@ if TYPE_CHECKING:
 
 def create_simple_mcp_server(
     base: type,
-    name: str = "SQLModel GraphQL API",
+    name: str = "SQLModel Nexus API",
     description: str = "GraphQL API for SQLModel entities",
 ) -> FastMCP:
     """Create a simplified MCP server for single-app scenarios.
@@ -269,7 +269,7 @@ def create_simple_mcp_server(
 
     Example:
         ```python
-        from sqlmodel_graphql.mcp import create_simple_mcp_server
+        from sqlmodel_nexus.mcp import create_simple_mcp_server
         from myapp.models import BaseEntity
 
         mcp = create_simple_mcp_server(
@@ -313,7 +313,7 @@ def create_simple_mcp_server(
 - [ ] **Step 2: Update __init__.py to export create_simple_mcp_server**
 
 ```python
-# src/sqlmodel_graphql/mcp/__init__.py
+# src/sqlmodel_nexus/mcp/__init__.py
 # Update __all__ and add import
 
 __all__ = [
@@ -324,10 +324,10 @@ __all__ = [
     "AppResources",
 ]
 
-from sqlmodel_graphql.mcp.managers import AppResources, MultiAppManager
-from sqlmodel_graphql.mcp.server import create_mcp_server
-from sqlmodel_graphql.mcp.simple_server import create_simple_mcp_server  # Add this
-from sqlmodel_graphql.mcp.types.app_config import AppConfig
+from sqlmodel_nexus.mcp.managers import AppResources, MultiAppManager
+from sqlmodel_nexus.mcp.server import create_mcp_server
+from sqlmodel_nexus.mcp.simple_server import create_simple_mcp_server  # Add this
+from sqlmodel_nexus.mcp.types.app_config import AppConfig
 ```
 
 - [ ] **Step 3: Run test to verify it passes**
@@ -352,8 +352,8 @@ Expected: PASS
         """Test that execute_query returns data."""
         from sqlmodel import Field, SQLModel
 
-        from sqlmodel_graphql import query
-        from sqlmodel_graphql.mcp import create_simple_mcp_server
+        from sqlmodel_nexus import query
+        from sqlmodel_nexus.mcp import create_simple_mcp_server
 
         class TestBase(SQLModel):
             pass
@@ -392,7 +392,7 @@ Expected: PASS
         """Test that execute_query with empty string returns error."""
         from sqlmodel import SQLModel
 
-        from sqlmodel_graphql.mcp import create_simple_mcp_server
+        from sqlmodel_nexus.mcp import create_simple_mcp_server
 
         class TestBase(SQLModel):
             pass
@@ -420,8 +420,8 @@ Expected: PASS
         """Test that execute_mutation returns data."""
         from sqlmodel import Field, SQLModel
 
-        from sqlmodel_graphql import mutation
-        from sqlmodel_graphql.mcp import create_simple_mcp_server
+        from sqlmodel_nexus import mutation
+        from sqlmodel_nexus.mcp import create_simple_mcp_server
 
         class TestBase(SQLModel):
             pass
@@ -458,9 +458,9 @@ Expected: All PASS
 - [ ] **Step 8: Commit changes**
 
 ```bash
-git add src/sqlmodel_graphql/mcp/tools/simple_tools.py
-git add src/sqlmodel_graphql/mcp/simple_server.py
-git add src/sqlmodel_graphql/mcp/__init__.py
+git add src/sqlmodel_nexus/mcp/tools/simple_tools.py
+git add src/sqlmodel_nexus/mcp/simple_server.py
+git add src/sqlmodel_nexus/mcp/__init__.py
 git add tests/test_mcp.py
 git commit -m "feat: add create_simple_mcp_server for single-app scenarios
 
@@ -484,4 +484,4 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
 
 **Final verification:**
 - `uv run pytest tests/test_mcp.py -v` - all tests pass
-- `uv run ruff check src/sqlmodel_graphql/mcp/` - no lint errors
+- `uv run ruff check src/sqlmodel_nexus/mcp/` - no lint errors

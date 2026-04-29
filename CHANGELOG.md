@@ -1,34 +1,75 @@
 # Changelog
 
-## 0.14.0
+## 1.0.0
 
-### Breaking Changes
+### New Public API: Core API Mode
 
-- **Remove `QueryMeta`** — the entire `QueryMeta` / `to_options()` mechanism has been replaced by DataLoader-based relationship resolution. User code no longer needs `query_meta` parameters or `stmt.options()` calls.
+sqlmodel-nexus now provides a complete Core API mode alongside GraphQL, enabling DTO-first response assembly for REST endpoints and service layers.
+
+**New exports from `sqlmodel_nexus`:**
+
+| Export | Purpose |
+|--------|---------|
+| `ErManager` | Central hub — discovers entities from SQLModel base, manages relationships, produces Resolvers |
+| `Loader` | Declare DataLoader dependencies in `resolve_*` method signatures |
+| `DefineSubset`, `SubsetConfig` | Create independent DTO models from SQLModel entities |
+| `ExposeAs`, `SendTo`, `Collector` | Cross-layer data flow (parent→descendant and descendant→ancestor) |
+| `Relationship`, `ErDiagram` | Custom non-ORM relationships and Mermaid ER diagram generation |
+
+**Core API usage:**
+
+```python
+from sqlmodel import SQLModel
+from sqlmodel_nexus import DefineSubset, ErManager, Loader
+
+er = ErManager(base=SQLModel, session_factory=async_session)
+Resolver = er.create_resolver()
+result = await Resolver(context={"user_id": 1}).resolve(dtos)
+```
 
 ### New Features
 
-- **DataLoader relationship resolution** — relationships are now loaded level-by-level via batched DataLoaders (using `aiodataloader`), eliminating N+1 queries without any user code
-- **Pagination for list relationships** — one-to-many and many-to-many relationships support `limit`/`offset` pagination with `has_more` and `total_count`, powered by `ROW_NUMBER()` window functions
-- **`enable_pagination`** flag on `GraphQLHandler` — when `True`, list relationships expose `EntityResult` types with `items` + `pagination` fields in the GraphQL schema
-- **`session_factory`** parameter on `GraphQLHandler` — required for DataLoader queries; pass your async session factory
+- **`ErManager`** — replaces internal `LoaderRegistry`. Accepts `base` (auto-discovers all `table=True` SQLModel subclasses) or `entities` (explicit list). Provides `create_resolver()` which returns a Resolver **class** bound to the entity graph.
+- **Implicit auto-loading** — DTO fields matching ORM relationship names are loaded automatically via DataLoader. No annotation needed; the framework checks field name match + type compatibility with `is_compatible_type`.
+- **`is_compatible_type`** — validates that a DTO type is compatible with the relationship's target entity before auto-loading, preventing silent type mismatches at runtime.
+- **Resolver metadata caching** — `_ClassMeta` cache avoids repeated `dir()` + `inspect.signature()` calls. Method parameters are analyzed once per class, reused across all instances.
+- **`scan_expose_fields` / `scan_send_to_fields` caching** — module-level caches for field metadata scanning.
+- **`_node_collectors` cleanup** — per-node collector entries are released immediately after traversal, preventing memory growth during large tree resolution.
+- **`_extract_sort_field` supports `desc()` / `asc()`** — handles SQLAlchemy `UnaryExpression` in `order_by` clauses.
+- **`get_loader_by_name` ambiguity warning** — logs a warning when multiple entities share the same relationship name.
+- **FK field lookup from registry** — `query_meta` uses actual FK field names from `ErManager` instead of assuming `{relationship_name}_id` convention.
+- **DataLoader factories use closures** — cleaner pattern; configuration captured in closure scope instead of class attributes.
 
-### Changes
+### Removed from Public API
 
-- `GraphQLHandler` accepts `session_factory` and `enable_pagination` parameters
-- SDL generator excludes FK fields from entity types and generates `Pagination` / `EntityResult` types when pagination is enabled
-- Introspection generator mirrors SDL behavior: FK field filtering, pagination type awareness, `limit`/`offset` args on list relationship fields
-- `@query` / `@mutation` methods no longer receive `query_meta` — relationships are resolved by the framework after the root method returns
-- Add `aiodataloader` dependency
-- Remove `types.py` (`QueryMeta`, `FieldSelection`, `RelationshipSelection`)
+| Removed | Replacement |
+|---------|-------------|
+| `AutoLoad` | Implicit auto-loading (field name matches relationship + compatible type) |
+| `LoaderRegistry` | `ErManager` (alias `LoaderRegistry = ErManager` kept for internal compat) |
+| `Resolver` (direct export) | `er.create_resolver()` returns a bound Resolver class |
 
-### Migration Guide
+### Migration from 0.14.0
 
-1. Remove `from sqlmodel_graphql import QueryMeta`
-2. Remove `query_meta: QueryMeta | None = None` from all `@query` / `@mutation` method signatures
-3. Remove `if query_meta: stmt = stmt.options(*query_meta.to_options(cls))` blocks
-4. Add `sa_relationship_kwargs={"order_by": "Entity.column"}` to list relationships for pagination support
-5. Pass `session_factory=async_session` to `GraphQLHandler`
+The 0.14.0 Core API exports were not yet part of a stable release. If you used them from the feature branch:
+
+```python
+# Before (0.14.0 feature branch)
+from sqlmodel_nexus import LoaderRegistry, Resolver, AutoLoad
+registry = LoaderRegistry(entities=[User, Task], session_factory=sf)
+result = await Resolver(registry).resolve(dtos)
+
+# After (1.0.0)
+from sqlmodel_nexus import ErManager
+er = ErManager(base=SQLModel, session_factory=sf)
+Resolver = er.create_resolver()
+result = await Resolver().resolve(dtos)
+```
+
+`AutoLoad()` annotations can be removed — implicit auto-loading handles it when field names match relationships.
+
+### GraphQL Mode
+
+No breaking changes. All existing `GraphQLHandler` usage works unchanged.
 
 
 ## 0.13.0

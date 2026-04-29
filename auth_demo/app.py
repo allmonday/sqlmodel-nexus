@@ -25,7 +25,7 @@ from pydantic import BaseModel
 from auth_demo.auth import require_admin
 from auth_demo.database import async_session, init_db
 from auth_demo.models import BaseEntity
-from sqlmodel_graphql import GraphQLHandler
+from sqlmodel_nexus import GraphQLHandler
 
 
 class GraphQLRequest(BaseModel):
@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI application
 app = FastAPI(
-    title="SQLModel GraphQL Auth Demo",
+    title="SQLModel Nexus Auth Demo",
     description="Demo application with API Key authentication for GraphQL endpoints",
     version="1.0.0",
     lifespan=lifespan,
@@ -94,7 +94,7 @@ async def get_schema(_: str = Depends(require_admin)):
 async def root():
     """Root endpoint with usage instructions."""
     return {
-        "message": "SQLModel GraphQL Auth Demo Server",
+        "message": "SQLModel Nexus Auth Demo Server",
         "authentication": {
             "type": "API Key",
             "header": "X-API-Key",
@@ -135,6 +135,9 @@ async def root():
 
 
 if __name__ == "__main__":
+    import os
+
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

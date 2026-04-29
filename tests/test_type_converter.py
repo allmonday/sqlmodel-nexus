@@ -4,7 +4,7 @@ from enum import Enum
 
 from sqlmodel import SQLModel
 
-from sqlmodel_graphql.type_converter import TypeConverter
+from sqlmodel_nexus.type_converter import TypeConverter
 
 
 class Status(Enum):

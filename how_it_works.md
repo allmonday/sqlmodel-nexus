@@ -1,6 +1,6 @@
-# SQLModel GraphQL 技术实现原理
+# SQLModel Nexus 技术实现原理
 
-本文档详细描述 sqlmodel-graphql 项目的转换逻辑和技术实现原理。
+本文档详细描述 sqlmodel-nexus 项目的转换逻辑和技术实现原理。
 
 ## 目录
 
@@ -10,17 +10,23 @@
 4. [数据流转换](#数据流转换)
 5. [类型系统](#类型系统)
 6. [DataLoader 关系解析](#dataloader-关系解析)
+7. [Core API 响应构建](#core-api-响应构建)
 
 ---
 
 ## 项目概述
 
-sqlmodel-graphql 是一个为 SQLModel 提供 GraphQL 支持的库，主要功能：
+sqlmodel-nexus 是一个为 SQLModel 提供 GraphQL 支持的库，主要功能：
 
 - **SDL 生成**：从 SQLModel 类自动生成 GraphQL Schema Definition Language
 - **查询执行**：执行 GraphQL 查询并返回结果
 - **DataLoader 关系解析**：通过 DataLoader 批量加载关联数据，自动避免 N+1 问题
 - **分页支持**：列表关系支持 limit/offset 分页
+- **Core API 响应构建**：通过 `DefineSubset` + `Resolver` 组装 DTO 树
+- **跨层数据流**：通过 `ExposeAs` / `SendTo` / `Collector` 在树中传递上下文
+- **自定义关系与 ER 图**：支持非 ORM `Relationship(...)` 和 Mermaid ER 图生成
+
+本文前 6 节聚焦 GraphQL 模式，第 7 节补充 Core API 模式如何复用同一套 LoaderRegistry。
 
 ### 核心设计理念
 
@@ -439,9 +445,43 @@ SELECT * FROM (
 
 ---
 
+## Core API 响应构建
+
+Core API 模式复用同一套 `LoaderRegistry` 和 DataLoader，但输出目标从 GraphQL
+响应切换为 DTO 树，适合 FastAPI REST 接口、服务层编排和非 GraphQL 用例。
+
+### 关键模块
+
+- **subset.py**：`DefineSubset` / `SubsetConfig`，从 SQLModel 实体定义独立 DTO
+- **resolver.py**：`Resolver` / `Loader` / `AutoLoad`，负责遍历 DTO 树并执行 `resolve_*` / `post_*`
+- **context.py**：`ExposeAs` / `SendTo` / `Collector`，负责跨层上下文和聚合
+- **relationship.py**：声明非 ORM `Relationship(...)`，接入手写批量 loader
+- **er_diagram.py**：基于 SQLAlchemy 元数据和自定义关系生成 Mermaid ER 图
+
+### 执行流程
+
+```
+SQLModel Entity         →     DefineSubset DTO
+   ↓                               ↓
+ LoaderRegistry         →   Resolver 遍历 DTO 树
+   ↓                               ↓
+ DataLoader 批量加载     →   resolve_* / AutoLoad / post_*
+                 ↓
+            ExposeAs / SendTo / Collector
+```
+
+### Core API 与 GraphQL 的关系
+
+- GraphQL 模式：入口是 `GraphQLHandler.execute()`，输出 GraphQL 响应字典
+- Core API 模式：入口是 `Resolver.resolve()`，输出已填充好的 DTO / DTO 列表
+- 两种模式共享 `LoaderRegistry`、DataLoader 批量加载和关系发现逻辑
+- Core API 模式额外支持 `post_*` 派生字段、跨层上下文和自定义非 ORM 关系
+
+---
+
 ## 总结
 
-sqlmodel-graphql 通过以下核心技术实现 GraphQL 支持：
+sqlmodel-nexus 通过以下核心技术实现 GraphQL 支持：
 
 1. **装饰器标记**：使用 `@query`/`@mutation` 装饰器声明 GraphQL 操作
 2. **类型转换**：`TypeConverter` 统一处理 Python → GraphQL 类型映射
@@ -450,9 +490,12 @@ sqlmodel-graphql 通过以下核心技术实现 GraphQL 支持：
 5. **关系解析**：`LoaderRegistry` + `DataLoader` 批量加载关联数据
 6. **分页支持**：`ROW_NUMBER()` 窗口函数实现 per-parent 分页
 7. **内省支持**：`IntrospectionGenerator` 支持 GraphiQL 等工具
+8. **DTO 构建**：`DefineSubset` + `Resolver` 组装 GraphQL 之外的响应对象
+9. **上下文流转**：`ExposeAs` / `SendTo` / `Collector` 处理树形上下文
+10. **扩展关系**：自定义 `Relationship(...)` 和 `ErDiagram` 支持非 ORM 场景
 
 这种设计实现了：
 - **声明式 API**：用户只需关注业务逻辑，不需要处理关系加载
 - **自动优化**：DataLoader 批量加载避免 N+1 查询问题
 - **类型安全**：完整的类型映射和验证
-- **工具兼容**：支持标准 GraphQL 工具链
+- **工具兼容**：同时支持标准 GraphQL 工具链和 Core API 响应构建
