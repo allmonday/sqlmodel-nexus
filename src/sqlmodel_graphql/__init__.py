@@ -54,7 +54,7 @@ Example (Core API mode):
 
 from __future__ import annotations
 
-__version__ = "0.14.0"
+__version__ = "1.0.0"
 
 from sqlmodel_graphql.context import Collector, ExposeAs, SendTo
 from sqlmodel_graphql.decorator import mutation, query
