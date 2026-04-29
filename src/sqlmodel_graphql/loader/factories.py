@@ -2,6 +2,10 @@
 
 Adapted from pydantic-resolve's integration.sqlalchemy.loader module.
 Simplified for sqlmodel-graphql where SQLModel serves as both ORM and DTO.
+
+All factory functions use closure captures for configuration parameters,
+keeping the DataLoader classes clean. Only ``_query_meta`` is set on
+instances dynamically (by query_meta.py) for SQL column pruning.
 """
 
 from __future__ import annotations
@@ -125,27 +129,22 @@ def create_many_to_one_loader(
             from sqlmodel import select
 
             effective_fields = _get_effective_query_fields(
-                self, self.target_kls,
-                extra_fields=[self.target_remote_col_name],
+                self, target_kls,
+                extra_fields=[target_remote_col_name],
             )
 
-            async with self.session_factory() as session:
-                stmt = select(self.target_kls)
+            async with session_factory() as session:
+                stmt = select(target_kls)
                 if effective_fields is not None:
-                    stmt = _apply_load_only(stmt, self.target_kls, effective_fields)
+                    stmt = _apply_load_only(stmt, target_kls, effective_fields)
                 stmt = stmt.where(
-                    getattr(self.target_kls, self.target_remote_col_name).in_(keys)
+                    getattr(target_kls, target_remote_col_name).in_(keys)
                 )
-                stmt = _apply_filters(stmt, self.filters)
+                stmt = _apply_filters(stmt, filters)
                 rows = (await session.exec(stmt)).all()
 
-            lookup = {getattr(row, self.target_remote_col_name): row for row in rows}
+            lookup = {getattr(row, target_remote_col_name): row for row in rows}
             return [lookup.get(k) for k in keys]
-
-    _Loader.target_kls = target_kls
-    _Loader.target_remote_col_name = target_remote_col_name
-    _Loader.session_factory = staticmethod(session_factory)
-    _Loader.filters = filters
 
     return _finalize_loader_class(
         _Loader,
@@ -177,30 +176,25 @@ def create_one_to_many_loader(
             from sqlmodel import select
 
             effective_fields = _get_effective_query_fields(
-                self, self.target_kls,
-                extra_fields=[self.target_fk_col_name],
+                self, target_kls,
+                extra_fields=[target_fk_col_name],
             )
 
-            async with self.session_factory() as session:
-                stmt = select(self.target_kls)
+            async with session_factory() as session:
+                stmt = select(target_kls)
                 if effective_fields is not None:
-                    stmt = _apply_load_only(stmt, self.target_kls, effective_fields)
+                    stmt = _apply_load_only(stmt, target_kls, effective_fields)
                 stmt = stmt.where(
-                    getattr(self.target_kls, self.target_fk_col_name).in_(keys)
+                    getattr(target_kls, target_fk_col_name).in_(keys)
                 )
-                stmt = _apply_filters(stmt, self.filters)
+                stmt = _apply_filters(stmt, filters)
                 rows = (await session.exec(stmt)).all()
 
             grouped = defaultdict(list)
             for row in rows:
-                grouped[getattr(row, self.target_fk_col_name)].append(row)
+                grouped[getattr(row, target_fk_col_name)].append(row)
 
             return [grouped.get(k, []) for k in keys]
-
-    _Loader.target_kls = target_kls
-    _Loader.target_fk_col_name = target_fk_col_name
-    _Loader.session_factory = staticmethod(session_factory)
-    _Loader.filters = filters
 
     return _finalize_loader_class(
         _Loader,
@@ -232,50 +226,42 @@ def create_many_to_many_loader(
             from sqlmodel import select
 
             effective_fields = _get_effective_query_fields(
-                self, self.target_kls,
-                extra_fields=[self.target_match_col_name],
+                self, target_kls,
+                extra_fields=[target_match_col_name],
             )
 
-            async with self.session_factory() as session:
-                join_stmt = select(self.secondary_table).where(
-                    getattr(self.secondary_table.c, self.secondary_local_col_name).in_(keys)
+            async with session_factory() as session:
+                join_stmt = select(secondary_table).where(
+                    getattr(secondary_table.c, secondary_local_col_name).in_(keys)
                 )
                 join_rows = (await session.exec(join_stmt)).all()
 
                 target_keys = list(
-                    {_row_get(row, self.secondary_remote_col_name) for row in join_rows}
+                    {_row_get(row, secondary_remote_col_name) for row in join_rows}
                 )
                 if not target_keys:
                     return [[] for _ in keys]
 
-                target_stmt = select(self.target_kls)
+                target_stmt = select(target_kls)
                 if effective_fields is not None:
-                    target_stmt = _apply_load_only(target_stmt, self.target_kls, effective_fields)
+                    target_stmt = _apply_load_only(target_stmt, target_kls, effective_fields)
                 target_stmt = target_stmt.where(
-                    getattr(self.target_kls, self.target_match_col_name).in_(target_keys)
+                    getattr(target_kls, target_match_col_name).in_(target_keys)
                 )
-                target_stmt = _apply_filters(target_stmt, self.filters)
+                target_stmt = _apply_filters(target_stmt, filters)
                 target_rows = (await session.exec(target_stmt)).all()
 
             target_map = {
-                getattr(row, self.target_match_col_name): row for row in target_rows
+                getattr(row, target_match_col_name): row for row in target_rows
             }
 
             grouped = defaultdict(list)
             for join_row in join_rows:
-                target_obj = target_map.get(_row_get(join_row, self.secondary_remote_col_name))
+                target_obj = target_map.get(_row_get(join_row, secondary_remote_col_name))
                 if target_obj is not None:
-                    grouped[_row_get(join_row, self.secondary_local_col_name)].append(target_obj)
+                    grouped[_row_get(join_row, secondary_local_col_name)].append(target_obj)
 
             return [grouped.get(k, []) for k in keys]
-
-    _Loader.target_kls = target_kls
-    _Loader.secondary_table = secondary_table
-    _Loader.secondary_local_col_name = secondary_local_col_name
-    _Loader.secondary_remote_col_name = secondary_remote_col_name
-    _Loader.target_match_col_name = target_match_col_name
-    _Loader.session_factory = staticmethod(session_factory)
-    _Loader.filters = filters
 
     return _finalize_loader_class(
         _Loader,
@@ -371,14 +357,14 @@ def create_page_one_to_many_loader(
             end = start + effective_limit
 
             effective_fields = _get_effective_query_fields(
-                self, self.target_kls,
-                extra_fields=[self.target_fk_col_name, self.sort_field, self.pk_col_name],
+                self, target_kls,
+                extra_fields=[target_fk_col_name, sort_field, pk_col_name],
             )
 
-            async with self.session_factory() as session:
-                fk_col = getattr(self.target_kls, self.target_fk_col_name)
-                sort_col = getattr(self.target_kls, self.sort_field)
-                pk_col = getattr(self.target_kls, self.pk_col_name)
+            async with session_factory() as session:
+                fk_col = getattr(target_kls, target_fk_col_name)
+                sort_col = getattr(target_kls, sort_field)
+                pk_col = getattr(target_kls, pk_col_name)
 
                 rn_label = "_sg_rn"
                 tc_label = "_sg_tc"
@@ -393,20 +379,20 @@ def create_page_one_to_many_loader(
                 ).label(tc_label)
 
                 inner = select(
-                    self.target_kls,
+                    target_kls,
                     row_num_col,
                     total_count_col,
                 )
                 if effective_fields is not None:
-                    inner = _apply_load_only(inner, self.target_kls, effective_fields)
+                    inner = _apply_load_only(inner, target_kls, effective_fields)
                 inner = inner.where(fk_col.in_(fk_values))
-                inner = _apply_filters(inner, self.filters)
+                inner = _apply_filters(inner, filters)
                 subq = inner.subquery()
 
                 rn_col = subq.c[rn_label]
-                fk_col_sub = subq.c[self.target_fk_col_name]
-                sort_col_sub = subq.c[self.sort_field]
-                pk_col_sub = subq.c[self.pk_col_name]
+                fk_col_sub = subq.c[target_fk_col_name]
+                sort_col_sub = subq.c[sort_field]
+                pk_col_sub = subq.c[pk_col_name]
 
                 outer = select(subq).where(rn_col.between(start, end)).order_by(
                     fk_col_sub, sort_col_sub, pk_col_sub,
@@ -417,7 +403,7 @@ def create_page_one_to_many_loader(
                 total_counts: dict[Any, int] = {}
                 for row in rows:
                     row_dict = row._mapping
-                    fk_val = row_dict[self.target_fk_col_name]
+                    fk_val = row_dict[target_fk_col_name]
                     rn = row_dict[rn_label]
                     tc = row_dict[tc_label]
                     grouped[fk_val].append((row_dict, rn))
@@ -430,7 +416,7 @@ def create_page_one_to_many_loader(
                         select(fk_col, func.count().label(tc_label))
                         .where(fk_col.in_(missing_fks))
                     )
-                    count_q = _apply_filters(count_q, self.filters)
+                    count_q = _apply_filters(count_q, filters)
                     count_q = count_q.group_by(fk_col)
                     for row in (await session.exec(count_q)).all():
                         total_counts[row[0]] = row[1]
@@ -443,17 +429,10 @@ def create_page_one_to_many_loader(
                         has_next_page=total_counts.get(cmd.fk_value, 0) >= end
                         if cmd.fk_value in total_counts
                         else False,
-                        entity_kls=self.target_kls,
+                        entity_kls=target_kls,
                     )
                     for cmd in keys
                 ]
-
-    _Loader.target_kls = target_kls
-    _Loader.target_fk_col_name = target_fk_col_name
-    _Loader.sort_field = sort_field
-    _Loader.pk_col_name = pk_col_name
-    _Loader.session_factory = staticmethod(session_factory)
-    _Loader.filters = filters
 
     return _finalize_loader_class(
         _Loader,
@@ -502,23 +481,23 @@ def create_page_many_to_many_loader(
             end = start + effective_limit
 
             effective_fields = _get_effective_query_fields(
-                self, self.target_kls,
-                extra_fields=[self.target_match_col_name, self.sort_field, self.pk_col_name],
+                self, target_kls,
+                extra_fields=[target_match_col_name, sort_field, pk_col_name],
             )
 
-            async with self.session_factory() as session:
-                sec_local_col = getattr(self.secondary_table.c, self.secondary_local_col_name)
-                sec_remote_col = getattr(self.secondary_table.c, self.secondary_remote_col_name)
-                target_match_col = getattr(self.target_kls, self.target_match_col_name)
-                sort_col = getattr(self.target_kls, self.sort_field)
-                pk_col = getattr(self.target_kls, self.pk_col_name)
+            async with session_factory() as session:
+                sec_local_col = getattr(secondary_table.c, secondary_local_col_name)
+                sec_remote_col = getattr(secondary_table.c, secondary_remote_col_name)
+                target_match_col = getattr(target_kls, target_match_col_name)
+                sort_col = getattr(target_kls, sort_field)
+                pk_col = getattr(target_kls, pk_col_name)
 
                 rn_label = "_sg_rn"
                 tc_label = "_sg_tc"
 
                 inner = select(
-                    self.target_kls,
-                    sec_local_col.label(self.secondary_local_col_name),
+                    target_kls,
+                    sec_local_col.label(secondary_local_col_name),
                     func.row_number().over(
                         partition_by=sec_local_col,
                         order_by=[sort_col, pk_col],
@@ -527,20 +506,20 @@ def create_page_many_to_many_loader(
                         partition_by=sec_local_col,
                     ).label(tc_label),
                 ).join(
-                    self.secondary_table,
+                    secondary_table,
                     target_match_col == sec_remote_col,
                 ).where(
                     sec_local_col.in_(fk_values),
                 )
                 if effective_fields is not None:
-                    inner = _apply_load_only(inner, self.target_kls, effective_fields)
-                inner = _apply_filters(inner, self.filters)
+                    inner = _apply_load_only(inner, target_kls, effective_fields)
+                inner = _apply_filters(inner, filters)
                 subq = inner.subquery()
 
                 rn_col = subq.c[rn_label]
-                sec_local_sub = subq.c[self.secondary_local_col_name]
-                sort_col_sub = subq.c[self.sort_field]
-                pk_col_sub = subq.c[self.pk_col_name]
+                sec_local_sub = subq.c[secondary_local_col_name]
+                sort_col_sub = subq.c[sort_field]
+                pk_col_sub = subq.c[pk_col_name]
 
                 outer = select(subq).where(rn_col.between(start, end)).order_by(
                     sec_local_sub, sort_col_sub, pk_col_sub,
@@ -551,7 +530,7 @@ def create_page_many_to_many_loader(
                 total_counts: dict[Any, int] = {}
                 for row in rows:
                     row_dict = row._mapping
-                    fk_val = row_dict[self.secondary_local_col_name]
+                    fk_val = row_dict[secondary_local_col_name]
                     rn = row_dict[rn_label]
                     tc = row_dict[tc_label]
                     grouped[fk_val].append((row_dict, rn))
@@ -563,7 +542,7 @@ def create_page_many_to_many_loader(
                         select(sec_local_col, func.count().label(tc_label))
                         .where(sec_local_col.in_(missing_fks))
                     )
-                    count_q = _apply_filters(count_q, self.filters)
+                    count_q = _apply_filters(count_q, filters)
                     count_q = count_q.group_by(sec_local_col)
                     for row in (await session.exec(count_q)).all():
                         total_counts[row[0]] = row[1]
@@ -576,20 +555,10 @@ def create_page_many_to_many_loader(
                         has_next_page=total_counts.get(cmd.fk_value, 0) >= end
                         if cmd.fk_value in total_counts
                         else False,
-                        entity_kls=self.target_kls,
+                        entity_kls=target_kls,
                     )
                     for cmd in keys
                 ]
-
-    _Loader.target_kls = target_kls
-    _Loader.secondary_table = secondary_table
-    _Loader.secondary_local_col_name = secondary_local_col_name
-    _Loader.secondary_remote_col_name = secondary_remote_col_name
-    _Loader.target_match_col_name = target_match_col_name
-    _Loader.sort_field = sort_field
-    _Loader.pk_col_name = pk_col_name
-    _Loader.session_factory = staticmethod(session_factory)
-    _Loader.filters = filters
 
     return _finalize_loader_class(
         _Loader,

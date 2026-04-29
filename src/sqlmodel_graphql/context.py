@@ -133,36 +133,52 @@ class Collector(ICollector):
 
 
 # ──────────────────────────────────────────────────────────
-# Metadata scanning helpers
+# Metadata scanning helpers (cached per class)
 # ──────────────────────────────────────────────────────────
+
+_expose_cache: dict[type, dict[str, str]] = {}
+_send_to_cache: dict[type, dict[str, str | tuple[str, ...]]] = {}
+
 
 def scan_expose_fields(kls: type[BaseModel]) -> dict[str, str]:
     """Scan a class for fields with ExposeAs annotation.
 
+    Results are cached per class since field metadata doesn't change.
+
     Returns:
         Dict mapping field_name -> alias for all ExposeAs-annotated fields.
     """
+    cached = _expose_cache.get(kls)
+    if cached is not None:
+        return cached
     result: dict[str, str] = {}
     for field_name, field_info in kls.model_fields.items():
         for meta in field_info.metadata:
             if isinstance(meta, ExposeInfo):
                 result[field_name] = meta.alias
                 break
+    _expose_cache[kls] = result
     return result
 
 
 def scan_send_to_fields(kls: type[BaseModel]) -> dict[str, str | tuple[str, ...]]:
     """Scan a class for fields with SendTo annotation.
 
+    Results are cached per class since field metadata doesn't change.
+
     Returns:
         Dict mapping field_name -> collector_name(s).
     """
+    cached = _send_to_cache.get(kls)
+    if cached is not None:
+        return cached
     result: dict[str, str | tuple[str, ...]] = {}
     for field_name, field_info in kls.model_fields.items():
         for meta in field_info.metadata:
             if isinstance(meta, SendToInfo):
                 result[field_name] = meta.collector_name
                 break
+    _send_to_cache[kls] = result
     return result
 
 

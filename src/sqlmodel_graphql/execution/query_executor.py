@@ -219,12 +219,21 @@ class QueryExecutor:
             set_query_meta,
         )
 
+        # Build FK lookup from target entity's registered relationships
+        # so query_meta uses actual FK names instead of {rel}_id convention
+        target_rels = self._registry.get_relationships(rel_info.target_entity)
+        fk_lookup = {name: info.fk_field for name, info in target_rels.items()}
+
         # Generate type_key for split mode (None in default mode)
-        type_key = generate_type_key_from_selection(child_sel, rel_info.target_entity)
+        type_key = generate_type_key_from_selection(
+            child_sel, rel_info.target_entity, fk_lookup=fk_lookup,
+        )
         loader = self._registry.get_loader(rel_info.loader, type_key=type_key)
 
         # Inject _query_meta for SQL column pruning
-        meta = generate_query_meta_from_selection(child_sel, rel_info.target_entity)
+        meta = generate_query_meta_from_selection(
+            child_sel, rel_info.target_entity, fk_lookup=fk_lookup,
+        )
         if type_key is not None and self._registry._split_mode:
             set_query_meta(loader, meta)
         else:
@@ -268,12 +277,20 @@ class QueryExecutor:
         items_sel = child_sel.sub_fields.get("items") if child_sel.sub_fields else None
         sel = items_sel if items_sel and items_sel.sub_fields else child_sel
 
+        # Build FK lookup from target entity's registered relationships
+        target_rels = self._registry.get_relationships(rel_info.target_entity)
+        fk_lookup = {name: info.fk_field for name, info in target_rels.items()}
+
         # Generate type_key for split mode (None in default mode)
-        type_key = generate_type_key_from_selection(sel, rel_info.target_entity)
+        type_key = generate_type_key_from_selection(
+            sel, rel_info.target_entity, fk_lookup=fk_lookup,
+        )
         loader = self._registry.get_loader(rel_info.page_loader, type_key=type_key)
 
         # Inject _query_meta for SQL column pruning
-        meta = generate_query_meta_from_selection(sel, rel_info.target_entity)
+        meta = generate_query_meta_from_selection(
+            sel, rel_info.target_entity, fk_lookup=fk_lookup,
+        )
         if type_key is not None and self._registry._split_mode:
             set_query_meta(loader, meta)
         else:

@@ -34,13 +34,21 @@ def generate_query_meta_from_dto(dto_class: type[BaseModel]) -> LoaderQueryMeta:
 def generate_query_meta_from_selection(
     field_selection: Any,
     entity_kls: type,
+    fk_lookup: dict[str, str] | None = None,
 ) -> LoaderQueryMeta:
     """Generate query_meta from a GraphQL FieldSelection + entity class.
 
     Only includes scalar fields that exist on the entity's model_fields.
     Relationship fields (those with sub_fields) are excluded from SQL column
     list since they're loaded via separate DataLoaders, but their FK columns
-    (e.g., owner_id for owner relationship) are preserved.
+    are preserved.
+
+    Args:
+        field_selection: Parsed GraphQL field selection.
+        entity_kls: Target entity class.
+        fk_lookup: Optional mapping of relationship_name -> fk_field_name
+            from LoaderRegistry. When provided, uses actual FK names instead
+            of the ``{rel_name}_id`` naming convention fallback.
     """
     if field_selection is None or not field_selection.sub_fields:
         return {
@@ -55,8 +63,12 @@ def generate_query_meta_from_selection(
             if fname in entity_kls.model_fields:
                 fields.append(fname)
         else:
-            # Relationship field: preserve the FK column (e.g., owner_id)
-            fk_name = f"{fname}_id"
+            # Relationship field: preserve the FK column
+            if fk_lookup and fname in fk_lookup:
+                fk_name = fk_lookup[fname]
+            else:
+                # Fallback to naming convention
+                fk_name = f"{fname}_id"
             if fk_name in entity_kls.model_fields and fk_name not in fields:
                 fields.append(fk_name)
 
@@ -94,11 +106,17 @@ def set_query_meta(loader: Any, meta: LoaderQueryMeta) -> None:
 def generate_type_key_from_selection(
     field_selection: Any,
     entity_kls: type,
+    fk_lookup: dict[str, str] | None = None,
 ) -> frozenset[str] | None:
     """Generate a hashable type_key from a GraphQL FieldSelection.
 
     Returns frozenset of scalar field names, or None if selection is empty
     (meaning no column pruning is possible).
+
+    Args:
+        field_selection: Parsed GraphQL field selection.
+        entity_kls: Target entity class.
+        fk_lookup: Optional mapping of relationship_name -> fk_field_name.
     """
     if field_selection is None or not field_selection.sub_fields:
         return None
@@ -109,7 +127,10 @@ def generate_type_key_from_selection(
             if fname in entity_kls.model_fields:
                 fields.add(fname)
         else:
-            fk_name = f"{fname}_id"
+            if fk_lookup and fname in fk_lookup:
+                fk_name = fk_lookup[fname]
+            else:
+                fk_name = f"{fname}_id"
             if fk_name in entity_kls.model_fields:
                 fields.add(fk_name)
 

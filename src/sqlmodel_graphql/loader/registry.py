@@ -49,7 +49,11 @@ def _expect_single_pair(pairs: Any, message: str) -> tuple[Any, Any]:
 
 
 def _extract_sort_field(order_by: Any) -> str:
-    """Extract column name from a SQLAlchemy order_by clause."""
+    """Extract column name from a SQLAlchemy order_by clause.
+
+    Handles plain column references (Column.key), as well as
+    desc(Column) / asc(Column) UnaryExpression wrappers.
+    """
     if isinstance(order_by, (list, tuple)):
         if len(order_by) == 0:
             raise ValueError("order_by cannot be empty")
@@ -59,12 +63,18 @@ def _extract_sort_field(order_by: Any) -> str:
             )
         order_by = order_by[0]
 
+    # Handle UnaryExpression: desc(Column), asc(Column)
+    if hasattr(order_by, "element"):
+        inner = order_by.element
+        if hasattr(inner, "key"):
+            return inner.key
+
     if hasattr(order_by, "key"):
         return order_by.key
 
     raise ValueError(
         f"Unable to extract sort field from order_by clause: {order_by}. "
-        f"Please use a simple column reference like Post.id"
+        f"Please use a simple column reference like Post.id or desc(Post.id)"
     )
 
 
@@ -397,14 +407,31 @@ class LoaderRegistry:
 
         Searches all registered entities for a relationship with the given name.
         Returns the first match, or None if not found.
+        Logs a warning if multiple entities have the same relationship name.
 
         Used by Resolver for Core API mode Loader() parameter injection.
+        Prefer get_loader_for_entity() when the source entity is known.
         """
-        for entity_rels in self._registry.values():
+        matches: list[tuple[type[SQLModel], RelationshipInfo]] = []
+        for entity_kls, entity_rels in self._registry.items():
             rel_info = entity_rels.get(name)
             if rel_info is not None:
-                return self.get_loader(rel_info.loader, type_key=type_key)
-        return None
+                matches.append((entity_kls, rel_info))
+
+        if not matches:
+            return None
+
+        if len(matches) > 1:
+            entity_names = [e.__name__ for e, _ in matches]
+            logger.warning(
+                "Ambiguous loader lookup: relationship '%s' found on %s. "
+                "Returning first match (%s). Use Loader() with a DefineSubset "
+                "DTO or get_loader_for_entity() for precision.",
+                name, entity_names, entity_names[0],
+            )
+
+        _, rel_info = matches[0]
+        return self.get_loader(rel_info.loader, type_key=type_key)
 
     def get_loader_for_entity(
         self,

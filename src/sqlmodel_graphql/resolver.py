@@ -29,6 +29,7 @@ import contextvars
 import inspect
 import typing
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from typing import Any, TypeVar, get_args, get_origin
 
 from aiodataloader import DataLoader
@@ -81,6 +82,107 @@ def Loader(dependency=None):
             return loader.load(self.owner_id)
     """
     return Depends(dependency=dependency)
+
+
+# ──────────────────────────────────────────────────────────
+# Class metadata cache — avoids repeated dir()/inspect.signature()
+# ──────────────────────────────────────────────────────────
+
+@dataclass
+class _MethodParamInfo:
+    """Pre-computed parameter information for a resolve_* or post_* method."""
+    has_context: bool = False
+    has_parent: bool = False
+    has_ancestor_context: bool = False
+    loader_deps: list[tuple[str, Depends]] = field(default_factory=list)
+    collector_deps: list[tuple[str, Collector]] = field(default_factory=list)
+
+
+@dataclass
+class _ClassMeta:
+    """Pre-computed metadata for a Pydantic model class.
+
+    Populated once per class type, reused across all instances.
+    """
+    # (field_name, attr_name) for resolve_* methods
+    resolve_methods: list[tuple[str, str]] = field(default_factory=list)
+    # (field_name, attr_name) for post_* methods
+    post_methods: list[tuple[str, str]] = field(default_factory=list)
+    # attr_name -> pre-parsed parameter info
+    resolve_params: dict[str, _MethodParamInfo] = field(default_factory=dict)
+    post_params: dict[str, _MethodParamInfo] = field(default_factory=dict)
+    # Collector aliases found in post_* methods: alias -> flat
+    collector_aliases: dict[str, bool] = field(default_factory=dict)
+
+
+def _analyze_method_params(method: Callable, *, include_collectors: bool = False) -> _MethodParamInfo:
+    """Analyze a method's signature and extract parameter metadata."""
+    sig = inspect.signature(method)
+    info = _MethodParamInfo()
+
+    for param_name, param in sig.parameters.items():
+        if param_name == "self":
+            continue
+        if param_name == "context":
+            info.has_context = True
+            continue
+        if param_name == "parent":
+            info.has_parent = True
+            continue
+        if param_name == "ancestor_context":
+            info.has_ancestor_context = True
+            continue
+
+        if param.default is not inspect.Parameter.empty:
+            if isinstance(param.default, Depends):
+                info.loader_deps.append((param_name, param.default))
+            elif include_collectors and isinstance(param.default, Collector):
+                info.collector_deps.append((param_name, param.default))
+
+    return info
+
+
+def _build_class_meta(kls: type) -> _ClassMeta:
+    """Build metadata for a class by scanning its methods once."""
+    meta = _ClassMeta()
+
+    for attr_name in dir(kls):
+        if attr_name.startswith("resolve_"):
+            field_name = attr_name[len("resolve_"):]
+            # Verify it's actually callable (not just an attribute)
+            attr = getattr(kls, attr_name, None)
+            if attr is not None and callable(attr):
+                meta.resolve_methods.append((field_name, attr_name))
+                meta.resolve_params[attr_name] = _analyze_method_params(attr)
+
+        elif attr_name.startswith("post_"):
+            field_name = attr_name[len("post_"):]
+            attr = getattr(kls, attr_name, None)
+            if attr is not None and callable(attr):
+                meta.post_methods.append((field_name, attr_name))
+                param_info = _analyze_method_params(attr, include_collectors=True)
+                meta.post_params[attr_name] = param_info
+                # Record collector aliases for _prepare_collectors
+                for _pname, collector in param_info.collector_deps:
+                    if collector.alias not in meta.collector_aliases:
+                        meta.collector_aliases[collector.alias] = collector.flat
+
+    return meta
+
+
+# Module-level class metadata cache. Safe because class structure doesn't
+# change at runtime. Shared across all Resolver instances.
+_class_meta_cache: dict[type, _ClassMeta] = {}
+
+
+def _get_class_meta(kls: type) -> _ClassMeta:
+    """Get or compute class metadata (cached globally)."""
+    cached = _class_meta_cache.get(kls)
+    if cached is not None:
+        return cached
+    meta = _build_class_meta(kls)
+    _class_meta_cache[kls] = meta
+    return meta
 
 
 # ──────────────────────────────────────────────────────────
@@ -181,28 +283,6 @@ class Resolver:
             self._loader_cache[fn] = DataLoader(batch_load_fn=fn)
         return self._loader_cache[fn]
 
-    def _scan_resolve_methods(self, node: Any) -> list[tuple[str, str, Callable]]:
-        """Scan a node for resolve_* methods."""
-        results = []
-        for attr_name in dir(type(node)):
-            if attr_name.startswith("resolve_"):
-                field_name = attr_name[len("resolve_"):]
-                method = getattr(node, attr_name)
-                if callable(method):
-                    results.append((field_name, field_name, method))
-        return results
-
-    def _scan_post_methods(self, node: Any) -> list[tuple[str, str, Callable]]:
-        """Scan a node for post_* methods."""
-        results = []
-        for attr_name in dir(type(node)):
-            if attr_name.startswith("post_"):
-                field_name = attr_name[len("post_"):]
-                method = getattr(node, attr_name)
-                if callable(method):
-                    results.append((field_name, field_name, method))
-        return results
-
     def _get_object_fields(self, node: Any) -> list[tuple[str, Any]]:
         """Get non-None fields that are BaseModel instances (for recursive traversal)."""
         results = []
@@ -223,7 +303,7 @@ class Resolver:
     # AutoLoad — automatic relationship loading
     # ──────────────────────────────────────────────────────
 
-    def _scan_auto_load_fields(self, node: Any) -> list[tuple[str, str, Any, Any]]:
+    def _scan_auto_load_fields(self, node: Any, meta: _ClassMeta) -> list[tuple[str, str, Any, Any]]:
         """Scan fields that should be auto-loaded from relationships.
 
         Detects fields by:
@@ -249,10 +329,13 @@ class Resolver:
         # Get subset field names so we can skip them (only extra fields are candidates)
         subset_field_names = set(getattr(type(node), "__subset_fields__", []))
 
+        # Build set of resolve method field names from cached meta
+        resolve_field_names = {fname for fname, _ in meta.resolve_methods}
+
         results = []
         for field_name, field_info in type(node).model_fields.items():
             # Skip fields that already have a manual resolve_* method
-            if hasattr(type(node), f"resolve_{field_name}"):
+            if field_name in resolve_field_names:
                 continue
 
             # Skip fields that are part of the subset definition
@@ -261,9 +344,9 @@ class Resolver:
 
             # 1. Check for explicit AutoLoad() annotation
             has_autoload = False
-            for meta in field_info.metadata:
-                if isinstance(meta, AutoLoadInfo):
-                    rel_name = meta.origin or field_name
+            for m in field_info.metadata:
+                if isinstance(m, AutoLoadInfo):
+                    rel_name = m.origin or field_name
                     rel_info = self._registry.get_relationship(
                         source_entity, rel_name
                     )
@@ -429,42 +512,24 @@ class Resolver:
         token = self._ancestor_var.set(new_context)
         return lambda: self._safe_reset(self._ancestor_var, token)
 
-    def _prepare_collectors(self, node: Any) -> Callable[[], None]:
+    def _prepare_collectors(self, node: Any, meta: _ClassMeta) -> Callable[[], None]:
         """Create Collector instances for this node's post_* methods.
 
-        Scans post_* method signatures for Collector parameters and
-        creates fresh Collector instances. Also propagates any existing
-        ancestor collectors downward.
+        Uses pre-computed collector_aliases from _ClassMeta to avoid
+        repeated method scanning and signature inspection.
 
         Returns a cleanup function.
         """
         if not isinstance(node, BaseModel):
             return lambda: None
 
-        # Scan post methods for Collector parameters
-        new_collectors: dict[str, ICollector] = {}
-        for attr_name in dir(type(node)):
-            if not attr_name.startswith("post_"):
-                continue
-            method = getattr(node, attr_name)
-            if not callable(method):
-                continue
-            sig = inspect.signature(method)
-            for param_name, param in sig.parameters.items():
-                if param_name == "self":
-                    continue
-                if (
-                    param.default is not inspect.Parameter.empty
-                    and isinstance(param.default, Collector)
-                ):
-                    alias = param.default.alias
-                    if alias not in new_collectors:
-                        new_collectors[alias] = Collector(
-                            alias=alias, flat=param.default.flat
-                        )
-
-        if not new_collectors:
+        if not meta.collector_aliases:
             return lambda: None
+
+        # Create fresh Collector instances from cached alias info
+        new_collectors: dict[str, ICollector] = {}
+        for alias, flat in meta.collector_aliases.items():
+            new_collectors[alias] = Collector(alias=alias, flat=flat)
 
         # Store per-node collectors for parameter injection
         self._node_collectors[id(node)] = new_collectors
@@ -510,39 +575,29 @@ class Resolver:
             pass
 
     # ──────────────────────────────────────────────────────
-    # Method execution with parameter injection
+    # Method execution with cached parameter info
     # ──────────────────────────────────────────────────────
 
     async def _execute_resolve_method(
         self,
         node: Any,
         method: Callable,
+        param_info: _MethodParamInfo,
     ) -> Any:
-        """Execute a resolve_* method with parameter injection."""
-        sig = inspect.signature(method)
+        """Execute a resolve_* method with parameter injection using cached info."""
         params = {}
 
-        for param_name, param in sig.parameters.items():
-            if param_name == "self":
-                continue
-            if param_name == "context":
-                params["context"] = self._context
-                continue
-            if param_name == "parent":
-                params["parent"] = self._parent_var.get()
-                continue
-            if param_name == "ancestor_context":
-                params["ancestor_context"] = self._ancestor_var.get() or {}
-                continue
+        if param_info.has_context:
+            params["context"] = self._context
+        if param_info.has_parent:
+            params["parent"] = self._parent_var.get()
+        if param_info.has_ancestor_context:
+            params["ancestor_context"] = self._ancestor_var.get() or {}
 
-            # Check for Depends (Loader) default
-            if param.default is not inspect.Parameter.empty and isinstance(
-                param.default, Depends
-            ):
-                loader = self._resolve_dep(node, param.default)
-                if loader is not None:
-                    params[param_name] = loader
-                continue
+        for param_name, dep in param_info.loader_deps:
+            loader = self._resolve_dep(node, dep)
+            if loader is not None:
+                params[param_name] = loader
 
         result = method(**params)
         while inspect.isawaitable(result):
@@ -553,33 +608,28 @@ class Resolver:
         self,
         node: Any,
         method: Callable,
+        param_info: _MethodParamInfo,
     ) -> Any:
-        """Execute a post_* method with parameter injection."""
-        sig = inspect.signature(method)
+        """Execute a post_* method with parameter injection using cached info."""
         params = {}
 
-        for param_name, param in sig.parameters.items():
-            if param_name == "self":
-                continue
-            if param_name == "context":
-                params["context"] = self._context
-                continue
-            if param_name == "parent":
-                params["parent"] = self._parent_var.get()
-                continue
-            if param_name == "ancestor_context":
-                params["ancestor_context"] = self._ancestor_var.get() or {}
-                continue
+        if param_info.has_context:
+            params["context"] = self._context
+        if param_info.has_parent:
+            params["parent"] = self._parent_var.get()
+        if param_info.has_ancestor_context:
+            params["ancestor_context"] = self._ancestor_var.get() or {}
 
-            # Check for Collector default
-            if param.default is not inspect.Parameter.empty and isinstance(
-                param.default, Collector
-            ):
-                node_cols = self._node_collectors.get(id(node), {})
-                collector = node_cols.get(param.default.alias)
-                if collector is not None:
-                    params[param_name] = collector
-                continue
+        for param_name, collector_default in param_info.collector_deps:
+            node_cols = self._node_collectors.get(id(node), {})
+            collector = node_cols.get(collector_default.alias)
+            if collector is not None:
+                params[param_name] = collector
+
+        for param_name, dep in param_info.loader_deps:
+            loader = self._resolve_dep(node, dep)
+            if loader is not None:
+                params[param_name] = loader
 
         result = method(**params)
         while inspect.isawaitable(result):
@@ -591,7 +641,7 @@ class Resolver:
     # ──────────────────────────────────────────────────────
 
     async def _traverse(self, node: T, parent: Any) -> T:
-        """Core traversal: prepare → resolve → traverse children → post → collect → cleanup."""
+        """Core traversal: prepare -> resolve -> traverse children -> post -> collect -> cleanup."""
         if isinstance(node, (list, tuple)):
             await asyncio.gather(*[self._traverse(t, parent) for t in node])
             return node
@@ -599,20 +649,24 @@ class Resolver:
         if not isinstance(node, BaseModel):
             return node
 
+        # Get or compute class metadata (cached globally)
+        meta = _get_class_meta(type(node))
+
         # Prepare phase: set up context for this node
         parent_token = self._parent_var.set(parent)
         expose_reset = self._prepare_expose_fields(node)
-        collector_reset = self._prepare_collectors(node)
+        collector_reset = self._prepare_collectors(node, meta)
 
         try:
-            # Phase 1: Execute resolve_* methods
-            resolve_methods = self._scan_resolve_methods(node)
-            auto_load_entries = self._scan_auto_load_fields(node)
+            # Phase 1: Execute resolve_* methods + AutoLoad
+            auto_load_entries = self._scan_auto_load_fields(node, meta)
 
             resolve_tasks = []
-            for _field_name, trim_field, method in resolve_methods:
+            for field_name, attr_name in meta.resolve_methods:
+                method = getattr(node, attr_name)
+                param_info = meta.resolve_params[attr_name]
                 resolve_tasks.append(
-                    self._resolve_and_set(node, trim_field, method)
+                    self._resolve_and_set(node, field_name, method, param_info)
                 )
 
             # AutoLoad: auto-resolve fields without manual resolve_* methods
@@ -631,11 +685,12 @@ class Resolver:
             await asyncio.gather(*resolve_tasks)
 
             # Phase 2: Execute post_* methods (after all resolves complete)
-            post_methods = self._scan_post_methods(node)
             post_tasks = []
-            for _field_name, trim_field, method in post_methods:
+            for field_name, attr_name in meta.post_methods:
+                method = getattr(node, attr_name)
+                param_info = meta.post_params[attr_name]
                 post_tasks.append(
-                    self._post_and_set(node, trim_field, method)
+                    self._post_and_set(node, field_name, method, param_info)
                 )
             await asyncio.gather(*post_tasks)
 
@@ -643,7 +698,8 @@ class Resolver:
             self._add_values_into_collectors(node)
 
         finally:
-            # Cleanup: reset all contextvars
+            # Cleanup: release per-node collectors and reset contextvars
+            self._node_collectors.pop(id(node), None)
             collector_reset()
             expose_reset()
             self._parent_var.reset(parent_token)
@@ -651,18 +707,18 @@ class Resolver:
         return node
 
     async def _resolve_and_set(
-        self, node: Any, trim_field: str, method: Callable
+        self, node: Any, trim_field: str, method: Callable, param_info: _MethodParamInfo,
     ) -> None:
         """Execute resolve method, traverse result, and set on node."""
-        result = await self._execute_resolve_method(node, method)
+        result = await self._execute_resolve_method(node, method, param_info)
         result = await self._traverse(result, node)
         setattr(node, trim_field, result)
 
     async def _post_and_set(
-        self, node: Any, trim_field: str, method: Callable
+        self, node: Any, trim_field: str, method: Callable, param_info: _MethodParamInfo,
     ) -> None:
         """Execute post method and set result on node."""
-        result = await self._execute_post_method(node, method)
+        result = await self._execute_post_method(node, method, param_info)
         setattr(node, trim_field, result)
 
     async def resolve(self, node: T) -> T:
