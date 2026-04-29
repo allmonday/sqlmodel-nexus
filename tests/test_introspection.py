@@ -233,10 +233,19 @@ class TestIntrospectionGenerator:
         assert "__schema" in result["data"]
         assert result["data"]["__schema"]["queryType"]["name"] == "Query"
 
+    def test_execute_type_query(self, generator: IntrospectionGenerator):
+        """__type queries should return the requested type payload."""
+        result = generator.execute('{ __type(name: "IntrospectionUser") { name kind } }')
+
+        assert "data" in result
+        assert result["data"]["__type"]["name"] == "IntrospectionUser"
+        assert result["data"]["__type"]["kind"] == "OBJECT"
+
     def test_is_introspection_query(self, generator: IntrospectionGenerator):
         """Test is_introspection_query() method."""
         assert generator.is_introspection_query("{ __schema { types { name } } }")
         assert generator.is_introspection_query("{ __type(name: \"User\") { name } }")
+        assert not generator.is_introspection_query("{ users { id } __schema { queryType { name } } }")
         assert not generator.is_introspection_query("{ users { id } }")
 
 

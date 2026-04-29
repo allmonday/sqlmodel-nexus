@@ -128,7 +128,12 @@ class Resolver:
         # Loader instance cache for Depends-based loaders
         self._loader_cache: dict[Any, DataLoader] = {}
 
-    def _get_loader(self, node: Any, loader_name: str) -> DataLoader | None:
+    def _get_loader(
+        self,
+        node: Any,
+        loader_name: str,
+        type_key: frozenset[str] | None = None,
+    ) -> DataLoader | None:
         """Get a DataLoader by name from the registry.
 
         DefineSubset DTOs resolve loaders within their source entity first,
@@ -144,10 +149,12 @@ class Resolver:
         if isinstance(node, BaseModel):
             source_entity = get_subset_source(type(node))
         if source_entity is not None:
-            loader = self._registry.get_loader_for_entity(source_entity, loader_name)
+            loader = self._registry.get_loader_for_entity(
+                source_entity, loader_name, type_key=type_key,
+            )
             if loader is not None:
                 return loader
-        return self._registry.get_loader_by_name(loader_name)
+        return self._registry.get_loader_by_name(loader_name, type_key=type_key)
 
     def _resolve_dep(self, node: Any, dep: Depends) -> DataLoader | None:
         """Resolve a Depends wrapper to a DataLoader instance."""
@@ -349,11 +356,25 @@ class Resolver:
         field_info: Any,
     ) -> None:
         """Execute auto-resolve for an AutoLoad field and set on node."""
-        loader = self._get_loader(node, rel_name)
+        from sqlmodel_graphql.loader.query_meta import (
+            generate_query_meta_from_dto,
+            generate_type_key_from_dto,
+            set_query_meta,
+        )
+
+        dto_cls = self._extract_dto_cls(field_info)
+
+        # Generate type_key for split mode and inject _query_meta.
+        # Safe for AutoLoad because _orm_to_dto only accesses
+        # __subset_fields__ fields, which are covered by _query_meta.
+        type_key = generate_type_key_from_dto(dto_cls) if dto_cls else None
+        loader = self._get_loader(node, rel_name, type_key=type_key)
         if loader is None:
             return
 
-        dto_cls = self._extract_dto_cls(field_info)
+        if dto_cls is not None and type_key is not None:
+            set_query_meta(loader, generate_query_meta_from_dto(dto_cls))
+
         is_custom = getattr(rel_info, "direction", "") == "CUSTOM"
 
         if rel_info.is_list:

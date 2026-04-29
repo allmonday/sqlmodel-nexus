@@ -33,9 +33,11 @@ class QueryExecutor:
         self,
         loader_registry: LoaderRegistry,
         enable_pagination: bool = False,
+        introspection_generator: Any | None = None,
     ):
         self._registry = loader_registry
         self._enable_pagination = enable_pagination
+        self._introspection_generator = introspection_generator
         self._argument_builder = ArgumentBuilder()
         # (id(entity), field_name) -> resolved value
         self._results: dict[tuple[int, str], Any] = {}
@@ -77,6 +79,17 @@ class QueryExecutor:
                         field_name = selection.name.value
 
                         try:
+                            if (
+                                op_type == "query"
+                                and self._introspection_generator is not None
+                                and field_name in {"__schema", "__type"}
+                            ):
+                                data[field_name] = self._introspection_generator.execute_field(
+                                    selection,
+                                    variables,
+                                )
+                                continue
+
                             if op_type == "query":
                                 method_info = query_methods.get(field_name)
                             else:
@@ -199,7 +212,24 @@ class QueryExecutor:
         child_sel: FieldSelection,
     ) -> None:
         """Batch load relationship data and recursively resolve nested."""
-        loader = self._registry.get_loader(rel_info.loader)
+        from sqlmodel_graphql.loader.query_meta import (
+            generate_query_meta_from_selection,
+            generate_type_key_from_selection,
+            merge_query_meta,
+            set_query_meta,
+        )
+
+        # Generate type_key for split mode (None in default mode)
+        type_key = generate_type_key_from_selection(child_sel, rel_info.target_entity)
+        loader = self._registry.get_loader(rel_info.loader, type_key=type_key)
+
+        # Inject _query_meta for SQL column pruning
+        meta = generate_query_meta_from_selection(child_sel, rel_info.target_entity)
+        if type_key is not None and self._registry._split_mode:
+            set_query_meta(loader, meta)
+        else:
+            merge_query_meta(loader, meta)
+
         results = await loader.load_many(fk_values)
 
         for parent, result in zip(parents, results, strict=True):
@@ -225,9 +255,30 @@ class QueryExecutor:
         child_sel: FieldSelection,
     ) -> None:
         """Load paginated relationship data."""
+        from sqlmodel_graphql.loader.query_meta import (
+            generate_query_meta_from_selection,
+            generate_type_key_from_selection,
+            merge_query_meta,
+            set_query_meta,
+        )
+
         page_args = self._extract_page_args(child_sel, rel_info)
 
-        loader = self._registry.get_loader(rel_info.page_loader)
+        # For paginated results, use items sub-selection if available
+        items_sel = child_sel.sub_fields.get("items") if child_sel.sub_fields else None
+        sel = items_sel if items_sel and items_sel.sub_fields else child_sel
+
+        # Generate type_key for split mode (None in default mode)
+        type_key = generate_type_key_from_selection(sel, rel_info.target_entity)
+        loader = self._registry.get_loader(rel_info.page_loader, type_key=type_key)
+
+        # Inject _query_meta for SQL column pruning
+        meta = generate_query_meta_from_selection(sel, rel_info.target_entity)
+        if type_key is not None and self._registry._split_mode:
+            set_query_meta(loader, meta)
+        else:
+            merge_query_meta(loader, meta)
+
         commands = [
             PageLoadCommand(fk_value=fk, page_args=page_args) for fk in fk_values
         ]
@@ -325,13 +376,15 @@ class QueryExecutor:
             # Paginated result: { items: [...], pagination: {...} }
             items = value.get("items", [])
             pagination = value.get("pagination")
-            # items child_sel is inside child_sel.sub_fields["items"]
-            items_sel = child_sel.sub_fields.get("items") if child_sel.sub_fields else None
-            serialized_items = [
-                self._serialize_entity(v, rel_info.target_entity, items_sel)
-                for v in items
-            ]
-            page_result: dict[str, Any] = {"items": serialized_items}
+            page_result: dict[str, Any] = {}
+            wants_items = child_sel.sub_fields is not None and "items" in child_sel.sub_fields
+            if wants_items:
+                items_sel = child_sel.sub_fields.get("items") if child_sel.sub_fields else None
+                serialized_items = [
+                    self._serialize_entity(v, rel_info.target_entity, items_sel)
+                    for v in items
+                ]
+                page_result["items"] = serialized_items
             # Only include pagination if the user selected it in the query
             wants_pagination = (
                 child_sel.sub_fields is not None and "pagination" in child_sel.sub_fields

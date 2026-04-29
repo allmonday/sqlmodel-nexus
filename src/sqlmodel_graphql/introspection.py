@@ -7,6 +7,8 @@ from collections.abc import Callable
 from enum import Enum
 from typing import TYPE_CHECKING, Any, get_type_hints
 
+from graphql import FieldNode, OperationDefinitionNode, parse
+from graphql.utilities import value_from_ast_untyped
 from sqlmodel import SQLModel
 
 from sqlmodel_graphql.type_converter import TypeConverter
@@ -74,7 +76,11 @@ class IntrospectionGenerator:
             "directives": [],
         }
 
-    def execute(self, query: str) -> dict[str, Any]:
+    def execute(
+        self,
+        query: str,
+        variables: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Execute an introspection query and return the response.
 
         Args:
@@ -83,14 +89,83 @@ class IntrospectionGenerator:
         Returns:
             Dictionary with 'data' key containing introspection results.
         """
-        # For simplicity, we always return the full schema
-        # Real introspection queries can filter specific fields, but most
-        # clients request the full schema anyway
-        return {"data": {"__schema": self.generate()}}
+        document = parse(query)
+        data: dict[str, Any] = {}
+
+        for definition in document.definitions:
+            if not isinstance(definition, OperationDefinitionNode):
+                continue
+
+            for selection in definition.selection_set.selections:
+                if not isinstance(selection, FieldNode):
+                    continue
+
+                field_name = selection.name.value
+                if field_name == "__schema":
+                    data[field_name] = self.generate()
+                elif field_name == "__type":
+                    data[field_name] = self._execute_type_query(selection, variables)
+
+        return {"data": data}
 
     def is_introspection_query(self, query: str) -> bool:
         """Check if the query is an introspection query."""
-        return "__schema" in query or "__type" in query
+        document = parse(query)
+
+        for definition in document.definitions:
+            if not isinstance(definition, OperationDefinitionNode):
+                continue
+
+            field_names = [
+                selection.name.value
+                for selection in definition.selection_set.selections
+                if isinstance(selection, FieldNode)
+            ]
+            if not field_names:
+                continue
+            if any(field_name not in {"__schema", "__type"} for field_name in field_names):
+                return False
+            return True
+
+        return False
+
+    def execute_field(
+        self,
+        field: FieldNode,
+        variables: dict[str, Any] | None = None,
+    ) -> Any:
+        """Execute a single introspection root field."""
+        field_name = field.name.value
+        if field_name == "__schema":
+            return self.generate()
+        if field_name == "__type":
+            return self._execute_type_query(field, variables)
+
+        raise ValueError(f"Unsupported introspection field: {field_name}")
+
+    def _execute_type_query(
+        self,
+        field: FieldNode,
+        variables: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """Resolve a __type(name: ...) query."""
+        type_name = self._get_type_name_argument(field, variables)
+        if not type_name:
+            return None
+
+        return next((t for t in self._get_all_types() if t["name"] == type_name), None)
+
+    def _get_type_name_argument(
+        self,
+        field: FieldNode,
+        variables: dict[str, Any] | None = None,
+    ) -> str | None:
+        """Extract the name argument from a __type query field."""
+        for argument in field.arguments or []:
+            if argument.name.value == "name":
+                value = value_from_ast_untyped(argument.value, variables)
+                return value if isinstance(value, str) else None
+        return None
 
     def _get_all_types(self) -> list[dict]:
         """Get all types in the schema."""

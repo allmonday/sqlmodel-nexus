@@ -51,6 +51,40 @@ def _apply_filters(stmt: Any, filters: list[Any] | None) -> Any:
     return stmt
 
 
+def _dedupe_fields(fields: list[str]) -> list[str]:
+    """Deduplicate fields while preserving order."""
+    seen: set[str] = set()
+    result: list[str] = []
+    for f in fields:
+        if f not in seen:
+            seen.add(f)
+            result.append(f)
+    return result
+
+
+def _get_default_fields(target_kls: type) -> list[str]:
+    """Get all model fields as fallback when _query_meta is not set."""
+    return list(target_kls.model_fields.keys())
+
+
+def _get_effective_query_fields(
+    loader: Any,
+    target_kls: type,
+    extra_fields: list[str] | None = None,
+) -> list[str] | None:
+    """Determine which SQL columns to SELECT based on _query_meta.
+
+    Returns None when _query_meta is not set, indicating that load_only
+    should not be applied (the loader will SELECT * as before).
+    This avoids DetachedInstanceError when ORM instances are accessed
+    outside the session context.
+    """
+    query_meta = getattr(loader, "_query_meta", None)
+    if not query_meta or "fields" not in query_meta:
+        return None
+    return _dedupe_fields([*query_meta["fields"], *(extra_fields or [])])
+
+
 def _apply_load_only(stmt: Any, target_kls: type, fields: list[str]) -> Any:
     from sqlalchemy import inspect as sa_inspect
     from sqlalchemy.orm import load_only
@@ -90,8 +124,16 @@ def create_many_to_one_loader(
         async def batch_load_fn(self, keys):
             from sqlmodel import select
 
+            effective_fields = _get_effective_query_fields(
+                self, self.target_kls,
+                extra_fields=[self.target_remote_col_name],
+            )
+
             async with self.session_factory() as session:
-                stmt = select(self.target_kls).where(
+                stmt = select(self.target_kls)
+                if effective_fields is not None:
+                    stmt = _apply_load_only(stmt, self.target_kls, effective_fields)
+                stmt = stmt.where(
                     getattr(self.target_kls, self.target_remote_col_name).in_(keys)
                 )
                 stmt = _apply_filters(stmt, self.filters)
@@ -134,8 +176,16 @@ def create_one_to_many_loader(
         async def batch_load_fn(self, keys):
             from sqlmodel import select
 
+            effective_fields = _get_effective_query_fields(
+                self, self.target_kls,
+                extra_fields=[self.target_fk_col_name],
+            )
+
             async with self.session_factory() as session:
-                stmt = select(self.target_kls).where(
+                stmt = select(self.target_kls)
+                if effective_fields is not None:
+                    stmt = _apply_load_only(stmt, self.target_kls, effective_fields)
+                stmt = stmt.where(
                     getattr(self.target_kls, self.target_fk_col_name).in_(keys)
                 )
                 stmt = _apply_filters(stmt, self.filters)
@@ -181,6 +231,11 @@ def create_many_to_many_loader(
         async def batch_load_fn(self, keys):
             from sqlmodel import select
 
+            effective_fields = _get_effective_query_fields(
+                self, self.target_kls,
+                extra_fields=[self.target_match_col_name],
+            )
+
             async with self.session_factory() as session:
                 join_stmt = select(self.secondary_table).where(
                     getattr(self.secondary_table.c, self.secondary_local_col_name).in_(keys)
@@ -193,7 +248,10 @@ def create_many_to_many_loader(
                 if not target_keys:
                     return [[] for _ in keys]
 
-                target_stmt = select(self.target_kls).where(
+                target_stmt = select(self.target_kls)
+                if effective_fields is not None:
+                    target_stmt = _apply_load_only(target_stmt, self.target_kls, effective_fields)
+                target_stmt = target_stmt.where(
                     getattr(self.target_kls, self.target_match_col_name).in_(target_keys)
                 )
                 target_stmt = _apply_filters(target_stmt, self.filters)
@@ -312,6 +370,11 @@ def create_page_one_to_many_loader(
             start = page_args.offset + 1
             end = start + effective_limit
 
+            effective_fields = _get_effective_query_fields(
+                self, self.target_kls,
+                extra_fields=[self.target_fk_col_name, self.sort_field, self.pk_col_name],
+            )
+
             async with self.session_factory() as session:
                 fk_col = getattr(self.target_kls, self.target_fk_col_name)
                 sort_col = getattr(self.target_kls, self.sort_field)
@@ -333,7 +396,10 @@ def create_page_one_to_many_loader(
                     self.target_kls,
                     row_num_col,
                     total_count_col,
-                ).where(fk_col.in_(fk_values))
+                )
+                if effective_fields is not None:
+                    inner = _apply_load_only(inner, self.target_kls, effective_fields)
+                inner = inner.where(fk_col.in_(fk_values))
                 inner = _apply_filters(inner, self.filters)
                 subq = inner.subquery()
 
@@ -435,6 +501,11 @@ def create_page_many_to_many_loader(
             start = page_args.offset + 1
             end = start + effective_limit
 
+            effective_fields = _get_effective_query_fields(
+                self, self.target_kls,
+                extra_fields=[self.target_match_col_name, self.sort_field, self.pk_col_name],
+            )
+
             async with self.session_factory() as session:
                 sec_local_col = getattr(self.secondary_table.c, self.secondary_local_col_name)
                 sec_remote_col = getattr(self.secondary_table.c, self.secondary_remote_col_name)
@@ -461,6 +532,8 @@ def create_page_many_to_many_loader(
                 ).where(
                     sec_local_col.in_(fk_values),
                 )
+                if effective_fields is not None:
+                    inner = _apply_load_only(inner, self.target_kls, effective_fields)
                 inner = _apply_filters(inner, self.filters)
                 subq = inner.subquery()
 

@@ -7,8 +7,8 @@ from sqlmodel import SQLModel, select
 
 from sqlmodel_graphql.decorator import mutation, query
 from sqlmodel_graphql.execution.query_executor import QueryExecutor
-from sqlmodel_graphql.loader.registry import LoaderRegistry
-from sqlmodel_graphql.query_parser import QueryParser
+from sqlmodel_graphql.loader.registry import LoaderRegistry, RelationshipInfo
+from sqlmodel_graphql.query_parser import FieldSelection, QueryParser
 from tests.conftest import (
     FixtureSprint,
     FixtureTask,
@@ -281,3 +281,53 @@ class TestQueryExecutorSerialization:
             assert "owner" in task
             assert task["owner"] is not None
             assert "name" in task["owner"]
+
+    async def test_paginated_serialization_only_returns_selected_fields(self):
+        """Paginated relationship responses should not include unselected items."""
+        executor = _make_executor(enable_pagination=True)
+
+        class PageItem(SQLModel, table=False):
+            id: int
+            name: str
+
+        rel_info = RelationshipInfo(
+            name="posts",
+            direction="ONETOMANY",
+            fk_field="author_id",
+            target_entity=PageItem,
+            is_list=True,
+            loader=object,
+        )
+        child_sel = QueryParser().parse("{ posts { pagination { total_count } } }")["posts"]
+
+        result = executor._serialize_relationship_value(
+            value={
+                "items": [PageItem(id=1, name="A")],
+                "pagination": {"total_count": 1, "has_more": False},
+            },
+            rel_info=rel_info,
+            child_sel=child_sel,
+        )
+
+        assert "items" not in result
+        assert result["pagination"] == {"total_count": 1}
+
+    def test_extract_page_args_rejects_negative_values(self):
+        """Negative pagination arguments should fail fast."""
+        executor = _make_executor(enable_pagination=True)
+
+        class Rel:
+            default_page_size = 20
+            max_page_size = 100
+
+        with pytest.raises(ValueError, match="limit must be greater than or equal to 0"):
+            executor._extract_page_args(
+                FieldSelection(arguments={"limit": -1}),
+                Rel(),
+            )
+
+        with pytest.raises(ValueError, match="offset must be greater than or equal to 0"):
+            executor._extract_page_args(
+                FieldSelection(arguments={"offset": -1}),
+                Rel(),
+            )

@@ -60,6 +60,25 @@ class QueryParser:
 
         return result
 
+    def validate_no_aliases(self, query: str) -> None:
+        """Reject GraphQL aliases explicitly."""
+        document = parse(query)
+
+        for definition in document.definitions:
+            if isinstance(definition, OperationDefinitionNode):
+                self._validate_selection_set_no_aliases(definition.selection_set)
+
+    def _validate_selection_set_no_aliases(self, selection_set: Any) -> None:
+        """Recursively validate that a selection set contains no aliases."""
+        for selection in selection_set.selections:
+            alias = getattr(selection, "alias", None)
+            if alias is not None:
+                raise ValueError("GraphQL aliases are not supported")
+
+            nested_selection_set = getattr(selection, "selection_set", None)
+            if nested_selection_set is not None:
+                self._validate_selection_set_no_aliases(nested_selection_set)
+
     def _parse_selection_set(self, selection_set: Any) -> FieldSelection:
         """Internal method to parse selection set into FieldSelection."""
         sub_fields: dict[str, FieldSelection] = {}

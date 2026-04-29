@@ -95,12 +95,6 @@ class GraphQLHandler:
         self._scanner = MethodScanner()
         self._query_methods, self._mutation_methods = self._scanner.scan(self.entities)
 
-        # Initialize executor with DataLoader support
-        self._executor = QueryExecutor(
-            loader_registry=self._loader_registry,
-            enable_pagination=enable_pagination,
-        )
-
         # Initialize introspection generator
         self._introspection_generator = IntrospectionGenerator(
             entities=self.entities,
@@ -110,6 +104,13 @@ class GraphQLHandler:
             mutation_description=mutation_description,
             enable_pagination=enable_pagination,
             loader_registry=self._loader_registry,
+        )
+
+        # Initialize executor with DataLoader support
+        self._executor = QueryExecutor(
+            loader_registry=self._loader_registry,
+            enable_pagination=enable_pagination,
+            introspection_generator=self._introspection_generator,
         )
 
     def get_sdl(self) -> str:
@@ -151,9 +152,7 @@ class GraphQLHandler:
             Dictionary with 'data' and/or 'errors' keys.
         """
         try:
-            # Check if this is an introspection query
-            if self._is_introspection_query(query):
-                return self._execute_introspection(query, variables)
+            self._query_parser.validate_no_aliases(query)
 
             # Parse the query to get field selections
             parsed_selections = self._query_parser.parse(query)
@@ -175,10 +174,10 @@ class GraphQLHandler:
 
     def _is_introspection_query(self, query: str) -> bool:
         """Check if the query is an introspection query."""
-        return "__schema" in query or "__type" in query
+        return self._introspection_generator.is_introspection_query(query)
 
     def _execute_introspection(
         self, query: str, variables: dict[str, Any] | None
     ) -> dict[str, Any]:
         """Execute an introspection query."""
-        return self._introspection_generator.execute(query)
+        return self._introspection_generator.execute(query, variables)

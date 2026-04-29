@@ -300,13 +300,17 @@ class LoaderRegistry:
         entities: list[type[SQLModel]],
         session_factory: Callable,
         enable_pagination: bool = False,
+        split_loader_by_type: bool = False,
     ):
         self._session_factory = session_factory
         self._enable_pagination = enable_pagination
+        self._split_mode = split_loader_by_type
         # entity -> {rel_name -> RelationshipInfo}
         self._registry: dict[type[SQLModel], dict[str, RelationshipInfo]] = {}
-        # Cache of instantiated loaders: loader_cls -> instance
-        self._loader_instances: dict[type[DataLoader], DataLoader] = {}
+        # Cache of instantiated loaders.
+        # Default mode: {loader_cls: instance}
+        # Split mode: {loader_cls: {type_key: instance}}
+        self._loader_instances: dict = {}
 
         all_entities = set(entities)
         for entity in entities:
@@ -356,17 +360,39 @@ class LoaderRegistry:
         rels = self._registry.get(entity, {})
         return rels.get(name)
 
-    def get_loader(self, loader_cls: type[DataLoader]) -> DataLoader:
-        """Get or create a DataLoader instance (cached per request)."""
+    def get_loader(
+        self,
+        loader_cls: type[DataLoader],
+        type_key: frozenset[str] | None = None,
+    ) -> DataLoader:
+        """Get or create a DataLoader instance (cached per request).
+
+        In split mode, creates separate instances per type_key so each
+        can have its own _query_meta for column pruning.
+        """
+        if not self._split_mode or type_key is None:
+            # Default mode / no type_key: shared instance per loader_cls
+            if loader_cls not in self._loader_instances:
+                self._loader_instances[loader_cls] = loader_cls()
+            return self._loader_instances[loader_cls]
+
+        # Split mode: per-type_key instances
         if loader_cls not in self._loader_instances:
-            self._loader_instances[loader_cls] = loader_cls()
-        return self._loader_instances[loader_cls]
+            self._loader_instances[loader_cls] = {}
+        inner: dict[frozenset[str], DataLoader] = self._loader_instances[loader_cls]
+        if type_key not in inner:
+            inner[type_key] = loader_cls()
+        return inner[type_key]
 
     def clear_cache(self) -> None:
         """Clear cached loader instances (call at start of each request)."""
         self._loader_instances.clear()
 
-    def get_loader_by_name(self, name: str) -> DataLoader | None:
+    def get_loader_by_name(
+        self,
+        name: str,
+        type_key: frozenset[str] | None = None,
+    ) -> DataLoader | None:
         """Get a DataLoader by relationship name.
 
         Searches all registered entities for a relationship with the given name.
@@ -377,11 +403,14 @@ class LoaderRegistry:
         for entity_rels in self._registry.values():
             rel_info = entity_rels.get(name)
             if rel_info is not None:
-                return self.get_loader(rel_info.loader)
+                return self.get_loader(rel_info.loader, type_key=type_key)
         return None
 
     def get_loader_for_entity(
-        self, entity: type[SQLModel], rel_name: str
+        self,
+        entity: type[SQLModel],
+        rel_name: str,
+        type_key: frozenset[str] | None = None,
     ) -> DataLoader | None:
         """Get a DataLoader for a specific entity's relationship.
 
@@ -393,4 +422,4 @@ class LoaderRegistry:
         rel_info = entity_rels.get(rel_name)
         if rel_info is None:
             return None
-        return self.get_loader(rel_info.loader)
+        return self.get_loader(rel_info.loader, type_key=type_key)

@@ -27,6 +27,17 @@ class PageArgs:
     default_page_size: int = 20
     max_page_size: int = 100
 
+    def __post_init__(self) -> None:
+        """Validate pagination arguments early."""
+        if self.limit is not None and self.limit < 0:
+            raise ValueError("limit must be greater than or equal to 0")
+        if self.offset < 0:
+            raise ValueError("offset must be greater than or equal to 0")
+        if self.default_page_size <= 0:
+            raise ValueError("default_page_size must be greater than 0")
+        if self.max_page_size <= 0:
+            raise ValueError("max_page_size must be greater than 0")
+
     @property
     def effective_limit(self) -> int:
         """Resolve the effective page size."""

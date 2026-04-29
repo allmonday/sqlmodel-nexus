@@ -65,13 +65,15 @@ def _unwrap_optional_type(annotation: Any) -> Any:
 def _get_primary_key_fields(entity: type[SQLModel]) -> list[tuple[str, Any]]:
     """Get primary key fields from an entity."""
     primary_keys: list[tuple[str, Any]] = []
+    table = getattr(entity, "__table__", None)
+    table_primary_keys = (
+        {column.name for column in table.primary_key.columns}
+        if table is not None and getattr(table, "primary_key", None) is not None
+        else set()
+    )
 
     for field_name, field_info in entity.model_fields.items():
-        if field_name == "id":
-            primary_keys.append((field_name, _unwrap_optional_type(field_info.annotation)))
-            continue
-
-        has_primary_key = False
+        has_primary_key = field_name in table_primary_keys
         has_foreign_key = False
 
         if hasattr(field_info, "primary_key"):
