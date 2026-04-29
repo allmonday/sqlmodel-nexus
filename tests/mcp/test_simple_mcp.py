@@ -11,14 +11,6 @@ from sqlmodel_nexus import mutation, query
 from sqlmodel_nexus.mcp import config_simple_mcp_server
 from sqlmodel_nexus.mcp.managers.single_app_manager import SingleAppManager
 
-# Check if fastmcp module is available
-try:
-    import fastmcp  # noqa: F401
-
-    HAS_MCP = True
-except ImportError:
-    HAS_MCP = False
-
 
 def _get_tools_dict(mcp):
     """Get tools as dict {name: tool} from FastMCP (compatible with fastmcp 3.x)."""
@@ -107,7 +99,6 @@ class TestSingleAppManager:
         assert "SimpleMCPMockUser" in entity_names
 
 
-@pytest.mark.skipif(not HAS_MCP, reason="fastmcp package not installed")
 class TestGetSchema:
     """Test cases for get_schema tool."""
 
@@ -147,7 +138,6 @@ class TestGetSchema:
         assert "type Mutation" not in result["data"]["sdl"]
 
 
-@pytest.mark.skipif(not HAS_MCP, reason="fastmcp package not installed")
 class TestGraphQLQuery:
     """Test cases for graphql_query tool."""
 
@@ -217,7 +207,6 @@ class TestGraphQLQuery:
         assert "simpleMCPMockUserGetUser" in result["data"]
 
 
-@pytest.mark.skipif(not HAS_MCP, reason="fastmcp package not installed")
 class TestGraphQLMutation:
     """Test cases for graphql_mutation tool."""
 
@@ -283,7 +272,6 @@ class TestGraphQLMutation:
         assert "graphql_mutation" not in tools
 
 
-@pytest.mark.skipif(not HAS_MCP, reason="fastmcp package not installed")
 class TestConfigSimpleMCPServer:
     """Test cases for config_simple_mcp_server function."""
 
@@ -355,7 +343,6 @@ class TestConfigSimpleMCPServer:
         assert "app_name" not in params
 
 
-@pytest.mark.skipif(not HAS_MCP, reason="fastmcp package not installed")
 class TestSimpleMCPIntegration:
     """Integration tests for simplified MCP server."""
 

@@ -51,7 +51,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from sqlmodel import SQLModel, Field, Relationship, select
-from sqlmodel_nexus import query, GraphQLHandler
+from sqlmodel_nexus import query, mutation, GraphQLHandler
 
 class User(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
@@ -69,6 +69,16 @@ class Post(SQLModel, table=True):
         """Get all posts."""
         async with get_session() as session:
             return (await session.exec(select(cls).limit(limit))).all()
+
+    @mutation
+    async def create(cls, title: str, author_id: int) -> 'Post':
+        """Create a new post."""
+        async with get_session() as session:
+            post = cls(title=title, author_id=author_id)
+            session.add(post)
+            await session.commit()
+            await session.refresh(post)
+            return post
 
 handler = GraphQLHandler(base=SQLModel, session_factory=async_session)
 
@@ -203,22 +213,27 @@ This is the Core API equivalent of GraphQL's relationship resolution — same Da
 Use `resolve_*` when implicit auto-loading doesn't fit: the field name doesn't match a relationship, or you need custom logic.
 
 ```python
-from sqlmodel_nexus import Loader
+from pydantic_resolve import Loader
+
+async def comments_loader(task_ids: list[int]) -> list[list[Comment]]:
+    """Batch load comments for multiple tasks."""
+    ...
 
 class TaskDTO(DefineSubset):
     __subset__ = (Task, ("id", "title", "owner_id"))
     owner: UserDTO | None = None          # implicit — matches Task.owner
-    assignee_name: str = ""               # custom — no matching relationship
+    comments: list[CommentDTO] = []       # custom — no matching relationship
+    comment_count: int = 0
 
-    def resolve_assignee_name(self, loader=Loader("owner")):
-        """Load via the 'owner' relationship but extract just the name."""
-        async def _load():
-            user = await loader.load(self.owner_id)
-            return user.name if user else ""
-        return _load()
+    def resolve_comments(self, loader=Loader(comments_loader)):
+        """Load comments via a custom batch function."""
+        return loader.load(self.id)
+
+    def post_comment_count(self):
+        return len(self.comments)
 ```
 
-`Loader("name")` looks up a relationship by name in the ErManager. You can also pass a DataLoader class or async batch function:
+`Loader` accepts a DataLoader class or an async batch function:
 
 ```python
 # By DataLoader class
