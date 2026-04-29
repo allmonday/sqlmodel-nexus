@@ -10,7 +10,7 @@ from sqlmodel_graphql.discovery import EntityDiscovery
 from sqlmodel_graphql.execution.query_executor import QueryExecutor
 from sqlmodel_graphql.graphiql import GRAPHIQL_HTML
 from sqlmodel_graphql.introspection import IntrospectionGenerator
-from sqlmodel_graphql.loader.registry import LoaderRegistry
+from sqlmodel_graphql.loader.registry import ErManager
 from sqlmodel_graphql.query_parser import QueryParser
 from sqlmodel_graphql.sdl_generator import SDLGenerator
 from sqlmodel_graphql.standard_queries import AutoQueryConfig, add_standard_queries
@@ -72,9 +72,9 @@ class GraphQLHandler:
         if auto_query_config is not None:
             add_standard_queries(self.entities, auto_query_config)
 
-        # Build loader registry for DataLoader-based relationship resolution
-        self._loader_registry = LoaderRegistry(
-            self.entities,
+        # Build ErManager for DataLoader-based relationship resolution
+        self._er_manager = ErManager(
+            entities=self.entities,
             session_factory=session_factory,
             enable_pagination=enable_pagination,
         )
@@ -103,12 +103,12 @@ class GraphQLHandler:
             query_description=query_description,
             mutation_description=mutation_description,
             enable_pagination=enable_pagination,
-            loader_registry=self._loader_registry,
+            loader_registry=self._er_manager,
         )
 
         # Initialize executor with DataLoader support
         self._executor = QueryExecutor(
-            loader_registry=self._loader_registry,
+            loader_registry=self._er_manager,
             enable_pagination=enable_pagination,
             introspection_generator=self._introspection_generator,
         )
@@ -121,7 +121,7 @@ class GraphQLHandler:
         """
         return self._sdl_generator.generate(
             enable_pagination=self.enable_pagination,
-            loader_registry=self._loader_registry,
+            loader_registry=self._er_manager,
         )
 
     def get_graphiql_html(self, endpoint: str = "/graphql") -> str:

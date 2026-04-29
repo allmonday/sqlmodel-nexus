@@ -7,7 +7,7 @@ from sqlmodel import SQLModel, select
 
 from sqlmodel_graphql.decorator import mutation, query
 from sqlmodel_graphql.execution.query_executor import QueryExecutor
-from sqlmodel_graphql.loader.registry import LoaderRegistry, RelationshipInfo
+from sqlmodel_graphql.loader.registry import ErManager, RelationshipInfo
 from sqlmodel_graphql.query_parser import FieldSelection, QueryParser
 from tests.conftest import (
     FixtureSprint,
@@ -28,7 +28,7 @@ def _make_executor(
         entities = [FixtureUser, FixtureSprint, FixtureTask]
     if session_factory is None:
         session_factory = get_test_session_factory()
-    registry = LoaderRegistry(
+    registry = ErManager(
         entities=entities,
         session_factory=session_factory,
         enable_pagination=enable_pagination,
@@ -342,7 +342,7 @@ def _make_split_executor(session_factory=None) -> QueryExecutor:
     """Build executor with split_loader_by_type=True."""
     if session_factory is None:
         session_factory = get_test_session_factory()
-    registry = LoaderRegistry(
+    registry = ErManager(
         entities=[FixtureUser, FixtureSprint, FixtureTask],
         session_factory=session_factory,
         split_loader_by_type=True,
@@ -471,7 +471,7 @@ class TestQueryExecutorSplitMode:
         """Default mode uses a single shared loader instance whose _query_meta
         fields reflect the queried selection."""
         session_factory = get_test_session_factory()
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
             # split_loader_by_type=False (default)

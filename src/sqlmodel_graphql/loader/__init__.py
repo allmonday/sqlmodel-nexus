@@ -1,4 +1,4 @@
-"""Loader module - DataLoader factories and relationship registry."""
+"""Loader module - DataLoader factories and entity-relationship management."""
 
 from sqlmodel_graphql.loader.pagination import (
     PageArgs,
@@ -6,10 +6,11 @@ from sqlmodel_graphql.loader.pagination import (
     Pagination,
     create_result_type,
 )
-from sqlmodel_graphql.loader.registry import LoaderRegistry, RelationshipInfo
+from sqlmodel_graphql.loader.registry import ErManager, LoaderRegistry, RelationshipInfo
 
 __all__ = [
-    "LoaderRegistry",
+    "ErManager",
+    "LoaderRegistry",  # backward-compatible alias
     "RelationshipInfo",
     "PageArgs",
     "PageLoadCommand",

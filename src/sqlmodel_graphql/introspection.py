@@ -44,7 +44,7 @@ class IntrospectionGenerator:
             query_description: Optional custom description for Query type.
             mutation_description: Optional custom description for Mutation type.
             enable_pagination: When True, list relationships produce Result types.
-            loader_registry: LoaderRegistry for relationship introspection.
+            loader_registry: ErManager for relationship introspection.
         """
         self.entities = entities
         self._entity_names = {e.__name__ for e in entities}

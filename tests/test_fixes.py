@@ -14,7 +14,7 @@ from sqlmodel_graphql.context import (
     scan_expose_fields,
     scan_send_to_fields,
 )
-from sqlmodel_graphql.loader.registry import LoaderRegistry, _extract_sort_field
+from sqlmodel_graphql.loader.registry import ErManager, _extract_sort_field
 from sqlmodel_graphql.relationship import Relationship
 from sqlmodel_graphql.resolver import Loader, Resolver, _class_meta_cache, _get_class_meta
 
@@ -245,7 +245,7 @@ class TestGetLoaderByNameAmbiguity:
         async def session_factory():
             pass  # Won't be called
 
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[AmbigEntity1, AmbigEntity2, AmbigTarget],
             session_factory=session_factory,
         )
@@ -271,7 +271,7 @@ class TestGetLoaderByNameAmbiguity:
                              loader=_noop_loader, is_list=True)
             ]
 
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[UniqueEntity, AmbigTarget],
             session_factory=session_factory,
         )

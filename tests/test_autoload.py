@@ -7,7 +7,7 @@ from aiodataloader import DataLoader
 from pydantic import BaseModel
 from sqlmodel import select
 
-from sqlmodel_graphql.loader.registry import LoaderRegistry
+from sqlmodel_graphql.loader.registry import ErManager
 from sqlmodel_graphql.resolver import Depends, Loader, Resolver
 from sqlmodel_graphql.subset import DefineSubset
 from tests.conftest import (
@@ -153,10 +153,10 @@ class TestLoaderWithDataLoaderClass:
 class TestLoaderWithStringName:
     @pytest.mark.usefixtures("test_db")
     async def test_loader_with_string_backward_compat(self):
-        """Loader('name') should still work for LoaderRegistry lookup."""
+        """Loader('name') should still work for ErManager lookup."""
 
         session_factory = get_test_session_factory()
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
@@ -193,7 +193,7 @@ class TestImplicitAutoLoad:
         """Fields matching a relationship name should auto-load."""
 
         session_factory = get_test_session_factory()
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
@@ -224,7 +224,7 @@ class TestImplicitAutoLoad:
         """One-to-many fields matching relationship name should auto-load."""
 
         session_factory = get_test_session_factory()
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
@@ -257,7 +257,7 @@ class TestImplicitAutoLoad:
         """Implicit auto-load + post_* should work together."""
 
         session_factory = get_test_session_factory()
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
@@ -291,7 +291,7 @@ class TestImplicitAutoLoad:
         """Fields that don't match a relationship should NOT auto-load."""
 
         session_factory = get_test_session_factory()
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
@@ -319,7 +319,7 @@ class TestImplicitAutoLoad:
         """Manual resolve_* method should take priority over implicit auto-load."""
 
         session_factory = get_test_session_factory()
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
@@ -350,7 +350,7 @@ class TestImplicitAutoLoad:
         """Implicit auto-load should handle non-existent FK value gracefully."""
 
         session_factory = get_test_session_factory()
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
@@ -372,7 +372,7 @@ class TestImplicitAutoLoad:
         """Fields with incompatible DTO types should NOT be auto-loaded."""
 
         session_factory = get_test_session_factory()
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )

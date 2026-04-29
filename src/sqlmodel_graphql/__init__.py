@@ -3,10 +3,10 @@
 This package provides:
 - Automatic GraphQL SDL generation from SQLModel classes
 - @query/@mutation decorators for defining GraphQL operations
-- DataLoader-based relationship resolution (replaces QueryMeta)
+- DataLoader-based relationship resolution
 - Per-relationship pagination support
 - DefineSubset for creating independent DTO models from SQLModel entities
-- Resolver for building use case responses with resolve_/post_ methods
+- ErManager for entity-relationship management and Resolver creation
 
 Example (GraphQL mode):
     ```python
@@ -33,7 +33,8 @@ Example (GraphQL mode):
 
 Example (Core API mode):
     ```python
-    from sqlmodel_graphql import DefineSubset, Resolver, Loader, LoaderRegistry
+    from sqlmodel import SQLModel
+    from sqlmodel_graphql import DefineSubset, ErManager, Loader
 
     class UserDTO(DefineSubset):
         __subset__ = (User, ('id', 'name'))
@@ -45,8 +46,9 @@ Example (Core API mode):
         def resolve_author(self, loader=Loader('author')):
             return loader.load(self.author_id)
 
-    registry = LoaderRegistry(entities=[User, Post], session_factory=session)
-    result = await Resolver(registry).resolve([PostDTO(...) for p in posts])
+    er = ErManager(base=SQLModel, session_factory=async_session)
+    Resolver = er.create_resolver()
+    result = await Resolver().resolve([PostDTO(...) for p in posts])
     ```
 """
 
@@ -58,10 +60,10 @@ from sqlmodel_graphql.context import Collector, ExposeAs, SendTo
 from sqlmodel_graphql.decorator import mutation, query
 from sqlmodel_graphql.er_diagram import ErDiagram
 from sqlmodel_graphql.handler import GraphQLHandler
-from sqlmodel_graphql.loader import LoaderRegistry
+from sqlmodel_graphql.loader import ErManager
 from sqlmodel_graphql.query_parser import FieldSelection, QueryParser
 from sqlmodel_graphql.relationship import Relationship
-from sqlmodel_graphql.resolver import Loader, Resolver
+from sqlmodel_graphql.resolver import Loader
 from sqlmodel_graphql.sdl_generator import SDLGenerator
 from sqlmodel_graphql.standard_queries import AutoQueryConfig, add_standard_queries
 from sqlmodel_graphql.subset import DefineSubset, SubsetConfig
@@ -76,7 +78,7 @@ __all__ = [
     "SDLGenerator",
     "QueryParser",
     "GraphQLHandler",
-    "LoaderRegistry",
+    "ErManager",
     # Types
     "FieldSelection",
     # Standard queries
@@ -85,7 +87,6 @@ __all__ = [
     # Core API mode (use case response building)
     "DefineSubset",
     "SubsetConfig",
-    "Resolver",
     "Loader",
     "ExposeAs",
     "SendTo",

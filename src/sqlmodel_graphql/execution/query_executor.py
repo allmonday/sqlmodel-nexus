@@ -13,7 +13,7 @@ from sqlmodel_graphql.loader.pagination import PageArgs, PageLoadCommand
 from sqlmodel_graphql.query_parser import FieldSelection
 
 if TYPE_CHECKING:
-    from sqlmodel_graphql.loader.registry import LoaderRegistry, RelationshipInfo
+    from sqlmodel_graphql.loader.registry import ErManager, RelationshipInfo
 
 
 class QueryExecutor:
@@ -31,7 +31,7 @@ class QueryExecutor:
 
     def __init__(
         self,
-        loader_registry: LoaderRegistry,
+        loader_registry: ErManager,
         enable_pagination: bool = False,
         introspection_generator: Any | None = None,
     ):

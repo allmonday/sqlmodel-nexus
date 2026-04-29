@@ -1,11 +1,11 @@
-"""Tests for LoaderRegistry — relationship discovery and DataLoader management."""
+"""Tests for ErManager — relationship discovery and DataLoader management."""
 
 from __future__ import annotations
 
 import pytest
 from sqlmodel import Field, SQLModel
 
-from sqlmodel_graphql.loader.registry import LoaderRegistry
+from sqlmodel_graphql.loader.registry import ErManager
 from sqlmodel_graphql.relationship import Relationship
 from tests.conftest import FixtureSprint, FixtureTask, FixtureUser, get_test_session_factory
 
@@ -59,10 +59,10 @@ class ConflictPost(SQLModel, table=True):
 # ──────────────────────────────────────────────────────────
 
 
-class TestLoaderRegistryDiscovery:
+class TestErManagerDiscovery:
     def test_discovers_many_to_one_relationship(self):
         """Registry should discover M2O relationships (FixtureTask.owner)."""
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=get_test_session_factory(),
         )
@@ -76,7 +76,7 @@ class TestLoaderRegistryDiscovery:
 
     def test_discovers_one_to_many_relationship(self):
         """Registry should discover O2M relationships (FixtureSprint.tasks)."""
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=get_test_session_factory(),
         )
@@ -90,7 +90,7 @@ class TestLoaderRegistryDiscovery:
 
     def test_get_relationship_returns_none_for_unknown(self):
         """Registry should return None for unknown relationship name."""
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=get_test_session_factory(),
         )
@@ -103,7 +103,7 @@ class TestLoaderRegistryDiscovery:
         class UnknownEntity(SQLModel, table=False):
             id: int
 
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=get_test_session_factory(),
         )
@@ -111,10 +111,10 @@ class TestLoaderRegistryDiscovery:
         assert registry.get_relationships(UnknownEntity) == {}
 
 
-class TestLoaderRegistryCache:
+class TestErManagerCache:
     def test_get_loader_caches_instance(self):
         """get_loader should return same instance for same loader class."""
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=get_test_session_factory(),
         )
@@ -129,7 +129,7 @@ class TestLoaderRegistryCache:
 
     def test_clear_cache_resets_instances(self):
         """clear_cache should remove all cached loader instances."""
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=get_test_session_factory(),
         )
@@ -144,7 +144,7 @@ class TestLoaderRegistryCache:
         assert loader1 is not loader2
 
 
-class TestLoaderRegistryPagination:
+class TestErManagerPagination:
     def test_pagination_validation_raises_on_missing_order_by(self):
         """enable_pagination without order_by should raise ValueError."""
         # FixtureUser has a relationship to FixtureTask (tasks)
@@ -155,7 +155,7 @@ class TestLoaderRegistryPagination:
 
         # Actually, let's just verify the validation works with
         # entities from conftest that DO have order_by
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=get_test_session_factory(),
             enable_pagination=True,
@@ -164,10 +164,10 @@ class TestLoaderRegistryPagination:
         assert registry is not None
 
 
-class TestLoaderRegistryCustomRelationships:
+class TestErManagerCustomRelationships:
     def test_custom_relationship_registered(self):
         """Custom __relationships__ should be registered."""
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[RegPost, RegTag],
             session_factory=lambda: None,
         )
@@ -181,14 +181,14 @@ class TestLoaderRegistryCustomRelationships:
     def test_name_conflict_raises(self):
         """Duplicate relationship name should raise ValueError."""
         with pytest.raises(ValueError, match="conflicts"):
-            LoaderRegistry(
+            ErManager(
                 entities=[ConflictPost, RegTag],
                 session_factory=lambda: None,
             )
 
     def test_get_loader_by_name(self):
         """get_loader_by_name should find loader across all entities."""
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[RegPost, RegTag],
             session_factory=lambda: None,
         )
@@ -198,7 +198,7 @@ class TestLoaderRegistryCustomRelationships:
 
     def test_get_loader_by_name_not_found(self):
         """get_loader_by_name should return None for unknown name."""
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[RegPost, RegTag],
             session_factory=lambda: None,
         )
@@ -208,7 +208,7 @@ class TestLoaderRegistryCustomRelationships:
 
     def test_get_loader_for_entity(self):
         """get_loader_for_entity should return loader for specific entity."""
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=get_test_session_factory(),
         )
@@ -218,7 +218,7 @@ class TestLoaderRegistryCustomRelationships:
 
     def test_get_loader_for_entity_not_found(self):
         """get_loader_for_entity should return None for unknown entity/rel."""
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=get_test_session_factory(),
         )

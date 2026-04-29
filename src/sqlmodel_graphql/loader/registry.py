@@ -1,6 +1,8 @@
-"""Relationship registry - inspects ORM metadata and creates DataLoaders.
+"""ErManager — inspects ORM metadata, creates DataLoaders, produces Resolvers.
 
-Adapted from pydantic-resolve's integration.sqlalchemy.inspector module.
+Central hub for entity-relationship management. Accepts a SQLModel base class
+or explicit entity list, auto-discovers relationships, and provides
+``create_resolver()`` for building request-scoped Resolver instances.
 """
 
 from __future__ import annotations
@@ -298,20 +300,36 @@ def _build_custom_relationship_info(rel: Relationship) -> RelationshipInfo:
     )
 
 
-class LoaderRegistry:
-    """Registry of DataLoader instances keyed by (entity, relationship_name).
+class ErManager:
+    """Entity-Relationship manager — the central hub for sqlmodel-graphql.
 
-    Inspects SQLModel ORM metadata to auto-discover relationships
-    and create the appropriate DataLoaders.
+    Inspects SQLModel ORM metadata to auto-discover relationships,
+    creates DataLoaders, and produces request-scoped Resolver instances.
+
+    Usage::
+
+        er = ErManager(base=SQLModel, session_factory=async_session)
+        resolver = er.create_resolver(context={"user_id": 1})
+        result = await resolver.resolve(dtos)
     """
 
     def __init__(
         self,
-        entities: list[type[SQLModel]],
         session_factory: Callable,
+        base: type | None = None,
+        entities: list[type[SQLModel]] | None = None,
         enable_pagination: bool = False,
         split_loader_by_type: bool = False,
     ):
+        if base is not None and entities is not None:
+            raise ValueError("base and entities are mutually exclusive")
+        if base is None and entities is None:
+            raise ValueError("Either base or entities must be provided")
+
+        if base is not None:
+            from sqlmodel_graphql.discovery import EntityDiscovery
+            entities = EntityDiscovery(base).discover(include_all=True)
+
         self._session_factory = session_factory
         self._enable_pagination = enable_pagination
         self._split_mode = split_loader_by_type
@@ -450,3 +468,38 @@ class LoaderRegistry:
         if rel_info is None:
             return None
         return self.get_loader(rel_info.loader, type_key=type_key)
+
+    def create_resolver(self) -> type:
+        """Create a Resolver class pre-wired with this ErManager.
+
+        Returns a Resolver **class** (not instance). Instantiate it
+        per-request with an optional ``context`` dict::
+
+            # App startup — once
+            Resolver = er.create_resolver()
+
+            # Per request
+            resolver = Resolver(context={"user_id": current_user.id})
+            result = await resolver.resolve(dtos)
+
+        Each instance holds its own DataLoader cache and contextvar state,
+        so concurrent requests are isolated.
+
+        Returns:
+            A Resolver subclass bound to this ErManager.
+        """
+        from sqlmodel_graphql.resolver import Resolver as _Resolver
+
+        er_manager = self
+
+        class BoundResolver(_Resolver):
+            def __init__(self, context: dict[str, Any] | None = None):
+                super().__init__(loader_registry=er_manager, context=context)
+
+        BoundResolver.__name__ = "Resolver"
+        BoundResolver.__qualname__ = "Resolver"
+        return BoundResolver
+
+
+# Backward-compatible alias
+LoaderRegistry = ErManager

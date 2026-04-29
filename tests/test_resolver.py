@@ -8,7 +8,7 @@ import pytest
 from pydantic import BaseModel
 from sqlmodel import select
 
-from sqlmodel_graphql.loader.registry import LoaderRegistry
+from sqlmodel_graphql.loader.registry import ErManager
 from sqlmodel_graphql.resolver import Loader, Resolver
 from sqlmodel_graphql.subset import DefineSubset
 from tests.conftest import (
@@ -156,16 +156,16 @@ class TestResolverPost:
 
 
 # ──────────────────────────────────────────────────────────
-# Test: Loader integration with LoaderRegistry
+# Test: Loader integration with ErManager
 # ──────────────────────────────────────────────────────────
 
 class TestResolverLoader:
     @pytest.mark.usefixtures("test_db")
     async def test_loader_with_registry(self):
-        """resolve_* should receive DataLoader from LoaderRegistry."""
+        """resolve_* should receive DataLoader from ErManager."""
 
         session_factory = get_test_session_factory()
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
@@ -198,7 +198,7 @@ class TestResolverLoader:
         """Multiple items should trigger batch loading (single query per relationship)."""
 
         session_factory = get_test_session_factory()
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
@@ -235,7 +235,7 @@ class TestResolverNested:
         """Resolve nested DefineSubset DTOs with DataLoader."""
 
         session_factory = get_test_session_factory()
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )

@@ -596,7 +596,7 @@ class TestSubsetConfigIntegration:
         from sqlmodel import select
 
         from sqlmodel_graphql.context import Collector
-        from sqlmodel_graphql.loader.registry import LoaderRegistry
+        from sqlmodel_graphql.loader.registry import ErManager
         from sqlmodel_graphql.resolver import Resolver
         from sqlmodel_graphql.subset import SubsetConfig
         from tests.conftest import init_test_db, seed_test_data
@@ -604,7 +604,7 @@ class TestSubsetConfigIntegration:
         await seed_test_data()
 
         session_factory = get_test_session_factory()
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
@@ -648,7 +648,7 @@ class TestSubsetConfigIntegration:
         from sqlmodel import select
 
         from sqlmodel_graphql.context import Collector
-        from sqlmodel_graphql.loader.registry import LoaderRegistry
+        from sqlmodel_graphql.loader.registry import ErManager
         from sqlmodel_graphql.resolver import Resolver
         from sqlmodel_graphql.subset import SubsetConfig
         from tests.conftest import init_test_db, seed_test_data
@@ -656,7 +656,7 @@ class TestSubsetConfigIntegration:
         await seed_test_data()
 
         session_factory = get_test_session_factory()
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )
@@ -734,7 +734,7 @@ class TestSubsetConfigIntegration:
         """SubsetConfig fields='all' should include all scalar fields + implicit AutoLoad."""
         from sqlmodel import select
 
-        from sqlmodel_graphql.loader.registry import LoaderRegistry
+        from sqlmodel_graphql.loader.registry import ErManager
         from sqlmodel_graphql.resolver import Resolver
         from sqlmodel_graphql.subset import SubsetConfig
         from tests.conftest import init_test_db, seed_test_data
@@ -742,7 +742,7 @@ class TestSubsetConfigIntegration:
         await seed_test_data()
 
         session_factory = get_test_session_factory()
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=session_factory,
         )

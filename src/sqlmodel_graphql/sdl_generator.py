@@ -109,7 +109,7 @@ class SDLGenerator:
         Args:
             include_mutations: If True, includes Mutation type in SDL. Default is True.
             enable_pagination: If True, list relationship fields become Result types.
-            loader_registry: LoaderRegistry for relationship introspection (required
+            loader_registry: ErManager for relationship introspection (required
                 when enable_pagination is True).
         """
         self._enable_pagination = enable_pagination

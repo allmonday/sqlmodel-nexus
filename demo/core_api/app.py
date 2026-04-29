@@ -2,7 +2,7 @@
 
 Demonstrates sqlmodel-graphql's Core API mode:
 - DefineSubset: independent DTOs from SQLModel entities
-- AutoLoad: automatic relationship loading with ORM->DTO conversion
+- Implicit auto-loading: automatic relationship loading with ORM->DTO conversion
 - Resolver: model-driven traversal with resolve_/post_ methods
 - ExposeAs/SendTo/Collector: cross-layer data flow
 - __relationships__: custom non-ORM relationships with hand-written loaders
@@ -34,11 +34,11 @@ from demo.core_api.dtos import (
 )
 from demo.core_api.models import Sprint, Tag, Task, User
 from sqlmodel_graphql import ErDiagram, Resolver
-from sqlmodel_graphql.loader import LoaderRegistry
+from sqlmodel_graphql.loader import ErManager
 
-# LoaderRegistry inspects ORM metadata and creates DataLoaders for all
+# ErManager inspects ORM metadata and creates DataLoaders for all
 # relationships between the provided entities.
-registry = LoaderRegistry(
+registry = ErManager(
     entities=[User, Sprint, Task, Tag],
     session_factory=async_session,
 )

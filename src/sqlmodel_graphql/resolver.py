@@ -4,10 +4,12 @@ Traverses Pydantic/DefineSubset model trees, executing resolve_* methods
 to load related data and post_* methods to compute derived fields.
 Supports cross-layer data flow via ExposeAs, SendTo, and Collector.
 
-Uses the same LoaderRegistry as GraphQL mode for DataLoader access.
+Uses the same ErManager as GraphQL mode for DataLoader access.
+Not intended for direct construction — use ``ErManager.create_resolver()``.
 
 Usage:
-    from sqlmodel_graphql import Resolver, DefineSubset, LoaderRegistry
+    from sqlmodel import SQLModel
+    from sqlmodel_graphql import DefineSubset, ErManager, Loader
 
     class PostSummary(DefineSubset):
         __subset__ = (Post, ('id', 'title', 'author_id'))
@@ -16,8 +18,9 @@ Usage:
         def resolve_author(self, loader=Loader('author')):
             return loader.load(self.author_id)
 
-    registry = LoaderRegistry(entities=[User, Post], session_factory=session_factory)
-    result = await Resolver(registry).resolve([
+    er = ErManager(base=SQLModel, session_factory=session_factory)
+    resolver = er.create_resolver()
+    result = await resolver.resolve([
         PostSummary.model_validate(p) for p in posts
     ])
 """
@@ -61,13 +64,13 @@ def Loader(dependency=None):
 
     Args:
         dependency: One of:
-            - str: relationship name in LoaderRegistry
+            - str: relationship name in ErManager
             - DataLoader subclass: instantiated and cached per Resolver
             - async callable: wrapped in DataLoader(batch_load_fn=...)
 
     Usage::
 
-        # By name (LoaderRegistry lookup)
+        # By name (ErManager lookup)
         def resolve_owner(self, loader=Loader('owner')):
             return loader.load(self.owner_id)
 
@@ -202,7 +205,7 @@ class Resolver:
     - Implicit auto-loading: fields matching ORM relationships are loaded automatically
 
     Args:
-        loader_registry: LoaderRegistry providing DataLoader instances.
+        loader_registry: ErManager providing DataLoader instances.
             If None, resolve_* methods must use their own loaders.
         context: Optional context dict accessible via `context` parameter.
     """

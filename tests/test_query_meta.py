@@ -289,15 +289,15 @@ class TestGenerateTypeKeyFromDto:
         assert key == frozenset({"id", "title"})
 
 
-# ── LoaderRegistry split mode ──
+# ── ErManager split mode ──
 
 
-class TestLoaderRegistrySplitMode:
+class TestErManagerSplitMode:
     def test_split_creates_separate_instances(self):
-        from sqlmodel_graphql.loader.registry import LoaderRegistry
+        from sqlmodel_graphql.loader.registry import ErManager
         from tests.conftest import FixtureTask, FixtureUser
 
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureTask],
             session_factory=lambda: None,
             split_loader_by_type=True,
@@ -315,10 +315,10 @@ class TestLoaderRegistrySplitMode:
         assert inst1 is not inst2
 
     def test_split_same_type_key_shares_instance(self):
-        from sqlmodel_graphql.loader.registry import LoaderRegistry
+        from sqlmodel_graphql.loader.registry import ErManager
         from tests.conftest import FixtureTask, FixtureUser
 
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureTask],
             session_factory=lambda: None,
             split_loader_by_type=True,
@@ -334,10 +334,10 @@ class TestLoaderRegistrySplitMode:
         assert inst1 is inst2
 
     def test_default_mode_ignores_type_key(self):
-        from sqlmodel_graphql.loader.registry import LoaderRegistry
+        from sqlmodel_graphql.loader.registry import ErManager
         from tests.conftest import FixtureTask, FixtureUser
 
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureTask],
             session_factory=lambda: None,
             # split_loader_by_type=False (default)
@@ -355,10 +355,10 @@ class TestLoaderRegistrySplitMode:
         assert inst1 is inst2
 
     def test_clear_cache_resets_split_instances(self):
-        from sqlmodel_graphql.loader.registry import LoaderRegistry
+        from sqlmodel_graphql.loader.registry import ErManager
         from tests.conftest import FixtureTask, FixtureUser
 
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureTask],
             session_factory=lambda: None,
             split_loader_by_type=True,

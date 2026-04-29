@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlmodel import Field, SQLModel
 
 from sqlmodel_graphql import DefineSubset, ErDiagram, Relationship
-from sqlmodel_graphql.loader.registry import LoaderRegistry, _build_custom_relationship_info
+from sqlmodel_graphql.loader.registry import ErManager, _build_custom_relationship_info
 from sqlmodel_graphql.relationship import get_custom_relationships
 from sqlmodel_graphql.resolver import Loader, Resolver
 from tests.conftest import FixtureSprint, FixtureTask, FixtureUser
@@ -207,14 +207,14 @@ class TestErDiagramCustomRelationships:
 
 
 # ──────────────────────────────────────────────────────────
-# Tests: LoaderRegistry integration
+# Tests: ErManager integration
 # ──────────────────────────────────────────────────────────
 
 
-class TestLoaderRegistryCustomRelationships:
+class TestErManagerCustomRelationships:
     def test_registry_includes_custom_relationships(self):
-        """LoaderRegistry should include custom relationships."""
-        registry = LoaderRegistry(
+        """ErManager should include custom relationships."""
+        registry = ErManager(
             entities=[Post, Tag, RelUser],
             session_factory=lambda: None,
         )
@@ -230,7 +230,7 @@ class TestLoaderRegistryCustomRelationships:
 
     def test_registry_custom_loader_works(self):
         """DataLoader from custom loader should work correctly."""
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[Post, Tag, RelUser],
             session_factory=lambda: None,
         )
@@ -249,7 +249,7 @@ class TestLoaderRegistryCustomRelationships:
         # Use the DuplicatePost which has duplicate custom names — the second
         # will conflict with the first during registration.
         with pytest.raises(ValueError, match="conflicts"):
-            LoaderRegistry(
+            ErManager(
                 entities=[DuplicatePost, RelUser],
                 session_factory=lambda: None,
             )
@@ -291,7 +291,7 @@ class TestLoaderRegistryCustomRelationships:
                 )
             ]
 
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[PrimaryPost, SecondaryPost, Tag],
             session_factory=lambda: None,
         )
@@ -331,7 +331,7 @@ class TestLoaderRegistryCustomRelationships:
                 )
             ]
 
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[CachePost, Tag],
             session_factory=lambda: None,
         )
@@ -368,7 +368,7 @@ class TestCustomRelationshipResolve:
                 for k in ids
             ]
 
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=lambda: None,
         )
@@ -407,7 +407,7 @@ class TestCustomRelationshipResolve:
         async def greeting_loader(ids: list[int]) -> list[list]:
             return [[f"Greeting for {i}"] for i in ids]
 
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=lambda: None,
         )
@@ -451,7 +451,7 @@ class TestCustomRelationshipResolve:
             id: int
             name: str
 
-        registry = LoaderRegistry(
+        registry = ErManager(
             entities=[FixtureUser, FixtureSprint, FixtureTask],
             session_factory=lambda: None,
         )
