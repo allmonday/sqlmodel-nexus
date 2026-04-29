@@ -43,7 +43,7 @@ class Relationship:
         target: Target SQLModel entity class. Used for type checking and
             ER diagram generation.
         name: Unique relationship name within this entity. Becomes the lookup
-            key in LoaderRegistry and AutoLoad.
+            key in LoaderRegistry and auto-loading.
         loader: Async batch loader function. Signature varies by is_list:
             - is_list=False: ``async def fn(keys: list[K]) -> list[V | None]``
             - is_list=True:  ``async def fn(keys: list[K]) -> list[list[V]]``

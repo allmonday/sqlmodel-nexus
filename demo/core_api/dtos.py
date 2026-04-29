@@ -7,13 +7,13 @@ Level 1: Basic field selection + FK hiding (UserSummary)
 Level 2: Implicit relationship loading (TaskSummary)
 Level 3: post_* derived fields (SprintSummary)
 Level 4: ExposeAs + SendTo + Collector cross-layer flow (SprintDetail, TaskDetail)
-Level 5: Custom __relationships__ + AutoLoad (TaskWithTags, SprintWithTags)
+Level 5: Custom __relationships__ + implicit auto-load (TaskWithTags, SprintWithTags)
 """
 
 from typing import Annotated
 
 from demo.core_api.models import Sprint, Tag, Task, User
-from sqlmodel_graphql import AutoLoad, Collector, DefineSubset, SubsetConfig
+from sqlmodel_graphql import Collector, DefineSubset, SubsetConfig
 
 # ──────────────────────────────────────────────────────────
 # Level 1: Basic DefineSubset — field selection + FK hiding
@@ -130,7 +130,7 @@ class SprintDetail(DefineSubset):
 
 
 # ──────────────────────────────────────────────────────────
-# Level 5: Custom __relationships__ + AutoLoad
+# Level 5: Custom __relationships__ + implicit auto-load
 # ──────────────────────────────────────────────────────────
 
 class TagDTO(DefineSubset):
@@ -145,7 +145,8 @@ class TaskWithTags(DefineSubset):
     a hand-written async loader (no ORM association table needed).
 
     The 'tags' field name matches the custom relationship name in
-    `Task.__relationships__`, so AutoLoad picks it up automatically.
+    `Task.__relationships__`, and its type (TagDTO) is compatible
+    with the relationship target (Tag), so it's auto-loaded.
     """
     __subset__ = SubsetConfig(
         kls=Task,
@@ -153,7 +154,7 @@ class TaskWithTags(DefineSubset):
     )
 
     owner: UserSummary | None = None
-    tags: Annotated[list[TagDTO], AutoLoad()] = []
+    tags: list[TagDTO] = []
     tag_count: int = 0
 
     def post_tag_count(self):

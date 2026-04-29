@@ -54,7 +54,7 @@ from __future__ import annotations
 
 __version__ = "0.14.0"
 
-from sqlmodel_graphql.context import AutoLoad, Collector, ExposeAs, SendTo
+from sqlmodel_graphql.context import Collector, ExposeAs, SendTo
 from sqlmodel_graphql.decorator import mutation, query
 from sqlmodel_graphql.er_diagram import ErDiagram
 from sqlmodel_graphql.handler import GraphQLHandler
@@ -87,7 +87,6 @@ __all__ = [
     "SubsetConfig",
     "Resolver",
     "Loader",
-    "AutoLoad",
     "ExposeAs",
     "SendTo",
     "Collector",

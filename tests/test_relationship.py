@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Annotated
-
 import pytest
 from pydantic import BaseModel
 from sqlmodel import Field, SQLModel
 
-from sqlmodel_graphql import AutoLoad, DefineSubset, ErDiagram, Relationship
+from sqlmodel_graphql import DefineSubset, ErDiagram, Relationship
 from sqlmodel_graphql.loader.registry import LoaderRegistry, _build_custom_relationship_info
 from sqlmodel_graphql.relationship import get_custom_relationships
-from sqlmodel_graphql.resolver import Resolver
+from sqlmodel_graphql.resolver import Loader, Resolver
 from tests.conftest import FixtureSprint, FixtureTask, FixtureUser
 
 # ──────────────────────────────────────────────────────────
@@ -354,14 +352,14 @@ class TestLoaderRegistryCustomRelationships:
 
 
 # ──────────────────────────────────────────────────────────
-# Tests: AutoLoad with custom relationships
+# Tests: Custom relationships with resolve_* and implicit auto-load
 # ──────────────────────────────────────────────────────────
 
 
-class TestAutoLoadCustomRelationship:
+class TestCustomRelationshipResolve:
     @pytest.mark.usefixtures("test_db")
-    async def test_autoload_custom_many_to_one(self):
-        """AutoLoad should work with custom many-to-one relationships."""
+    async def test_custom_many_to_one_with_resolve(self):
+        """Custom M2O relationship should work with resolve_* + Loader."""
 
         async def user_loader(ids: list[int]) -> list:
             return [
@@ -391,7 +389,10 @@ class TestAutoLoadCustomRelationship:
 
         class TaskDTO(DefineSubset):
             __subset__ = (FixtureTask, ("id", "title", "owner_id"))
-            custom_owner: Annotated[UserDTO | None, AutoLoad()] = None
+            custom_owner: UserDTO | None = None
+
+            def resolve_custom_owner(self, loader=Loader("custom_owner")):
+                return loader.load(self.owner_id)
 
         dto = TaskDTO(id=1, title="Test", owner_id=1)
         result = await Resolver(registry).resolve(dto)
@@ -400,8 +401,8 @@ class TestAutoLoadCustomRelationship:
         assert result.custom_owner.name == "Alice"
 
     @pytest.mark.usefixtures("test_db")
-    async def test_autoload_custom_one_to_many(self):
-        """AutoLoad should work with custom one-to-many (is_list=True) relationships."""
+    async def test_custom_one_to_many_with_resolve(self):
+        """Custom O2M relationship with non-DTO type should use resolve_*."""
 
         async def greeting_loader(ids: list[int]) -> list[list]:
             return [[f"Greeting for {i}"] for i in ids]
@@ -424,7 +425,10 @@ class TestAutoLoadCustomRelationship:
 
         class SprintDTO(DefineSubset):
             __subset__ = (FixtureSprint, ("id", "name"))
-            greetings: Annotated[list[str], AutoLoad()] = []
+            greetings: list[str] = []
+
+            def resolve_greetings(self, loader=Loader("greetings")):
+                return loader.load(self.id)
 
         dto = SprintDTO(id=1, name="Sprint 1")
         result = await Resolver(registry).resolve(dto)
@@ -433,8 +437,8 @@ class TestAutoLoadCustomRelationship:
         assert result.greetings[0] == "Greeting for 1"
 
     @pytest.mark.usefixtures("test_db")
-    async def test_custom_loader_returns_basemodel_skips_conversion(self):
-        """Custom loader returning BaseModel instances should skip ORM→DTO conversion."""
+    async def test_custom_loader_returns_basemodel_with_resolve(self):
+        """Custom loader returning BaseModel instances via resolve_*."""
 
         class InnerUserDTO(BaseModel):
             id: int
@@ -465,7 +469,10 @@ class TestAutoLoadCustomRelationship:
 
         class TaskDTO(DefineSubset):
             __subset__ = (FixtureTask, ("id", "title", "owner_id"))
-            custom_owner: Annotated[UserDTO | None, AutoLoad()] = None
+            custom_owner: UserDTO | None = None
+
+            def resolve_custom_owner(self, loader=Loader("custom_owner")):
+                return loader.load(self.owner_id)
 
         dto = TaskDTO(id=1, title="Test", owner_id=1)
         result = await Resolver(registry).resolve(dto)

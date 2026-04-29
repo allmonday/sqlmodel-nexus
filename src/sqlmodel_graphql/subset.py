@@ -124,7 +124,7 @@ def _extract_field_infos(
     field_definitions: dict[str, tuple[Any, FieldInfo]] = {}
 
     for field_name in field_names:
-        # Skip relationship fields — these will be handled via AutoLoad or manual resolve
+        # Skip relationship fields — these will be handled via implicit auto-loading or manual resolve
         if field_name in relationship_names:
             continue
 
@@ -574,7 +574,7 @@ class SubsetMeta(type):
         setattr(subset_class, SUBSET_REFERENCE, entity_kls)
         _subset_registry[subset_class] = entity_kls
 
-        # Store subset field names for AutoLoad ORM→DTO conversion
+        # Store subset field names for implicit auto-load ORM→DTO conversion
         subset_class.__subset_fields__ = list(subset_fields)
 
         return subset_class
@@ -591,7 +591,7 @@ class DefineSubset(metaclass=SubsetMeta):
     FK fields are automatically hidden from output (exclude=True) but remain
     available internally for relationship resolution.
 
-    Extra fields (AutoLoad, resolve_*, post_*) can be declared in the class body:
+    Extra fields (resolve_*, post_*) can be declared in the class body.
 
         class PostSummary(DefineSubset):
             __subset__ = (Post, ('id', 'title', 'author_id'))

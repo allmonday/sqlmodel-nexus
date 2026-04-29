@@ -199,7 +199,7 @@ class Resolver:
     Supports cross-layer data flow:
     - ExposeAs: parent fields exposed to descendants via ancestor_context
     - SendTo + Collector: descendant fields aggregated to ancestors
-    - AutoLoad: automatic relationship loading with ORM->DTO conversion
+    - Implicit auto-loading: fields matching ORM relationships are loaded automatically
 
     Args:
         loader_registry: LoaderRegistry providing DataLoader instances.
@@ -300,30 +300,32 @@ class Resolver:
         return results
 
     # ──────────────────────────────────────────────────────
-    # AutoLoad — automatic relationship loading
+    # Implicit auto-loading — automatic relationship loading
     # ──────────────────────────────────────────────────────
 
     def _scan_auto_load_fields(self, node: Any, meta: _ClassMeta) -> list[tuple[str, str, Any, Any]]:
         """Scan fields that should be auto-loaded from relationships.
 
-        Detects fields by:
-        1. Explicit: AutoLoad() annotation in field metadata
-        2. Implicit: field name matches a relationship on the source entity
-           and field type is a BaseModel subclass (DTO)
+        A field is auto-loaded when ALL of these conditions are met:
+        1. No manual resolve_* method exists for the field
+        2. The field is not part of the __subset__ definition (it's an extra field)
+        3. The field name matches a registered relationship on the source entity
+        4. The field type is a BaseModel subclass (DTO)
+        5. The DTO type is compatible with the relationship's target entity
 
         Returns list of (field_name, rel_name, rel_info, field_info).
         """
         if not isinstance(node, BaseModel) or self._registry is None:
             return []
 
-        from sqlmodel_graphql.context import AutoLoadInfo
         from sqlmodel_graphql.subset import get_subset_source
+        from sqlmodel_graphql.utils.type_compat import is_compatible_type
 
         source_entity = get_subset_source(type(node))
         if source_entity is None:
             return []
 
-        # Get relationship names from source entity for implicit matching
+        # Get relationship names from source entity
         entity_rels = self._registry.get_relationships(source_entity)
 
         # Get subset field names so we can skip them (only extra fields are candidates)
@@ -334,33 +336,24 @@ class Resolver:
 
         results = []
         for field_name, field_info in type(node).model_fields.items():
-            # Skip fields that already have a manual resolve_* method
             if field_name in resolve_field_names:
                 continue
-
-            # Skip fields that are part of the subset definition
             if field_name in subset_field_names:
                 continue
 
-            # 1. Check for explicit AutoLoad() annotation
-            has_autoload = False
-            for m in field_info.metadata:
-                if isinstance(m, AutoLoadInfo):
-                    rel_name = m.origin or field_name
-                    rel_info = self._registry.get_relationship(
-                        source_entity, rel_name
-                    )
-                    if rel_info is not None:
-                        results.append((field_name, rel_name, rel_info, field_info))
-                    has_autoload = True
-                    break
+            # Field name must match a registered relationship
+            if field_name not in entity_rels:
+                continue
 
-            # 2. Implicit: field name matches a relationship + type is BaseModel
-            if not has_autoload and field_name in entity_rels:
-                dto_cls = self._extract_dto_cls(field_info)
-                if dto_cls is not None:
-                    rel_info = entity_rels[field_name]
-                    results.append((field_name, field_name, rel_info, field_info))
+            # Field type must be a BaseModel DTO
+            dto_cls = self._extract_dto_cls(field_info)
+            if dto_cls is None:
+                continue
+
+            # DTO must be compatible with the relationship's target entity
+            rel_info = entity_rels[field_name]
+            if is_compatible_type(dto_cls, rel_info.target_entity):
+                results.append((field_name, field_name, rel_info, field_info))
 
         return results
 
@@ -438,7 +431,7 @@ class Resolver:
         rel_info: Any,
         field_info: Any,
     ) -> None:
-        """Execute auto-resolve for an AutoLoad field and set on node."""
+        """Execute auto-resolve for an implicit auto-load field and set on node."""
         from sqlmodel_graphql.loader.query_meta import (
             generate_query_meta_from_dto,
             generate_type_key_from_dto,
@@ -448,7 +441,7 @@ class Resolver:
         dto_cls = self._extract_dto_cls(field_info)
 
         # Generate type_key for split mode and inject _query_meta.
-        # Safe for AutoLoad because _orm_to_dto only accesses
+        # Safe for implicit auto-load because _orm_to_dto only accesses
         # __subset_fields__ fields, which are covered by _query_meta.
         type_key = generate_type_key_from_dto(dto_cls) if dto_cls else None
         loader = self._get_loader(node, rel_name, type_key=type_key)
@@ -658,7 +651,7 @@ class Resolver:
         collector_reset = self._prepare_collectors(node, meta)
 
         try:
-            # Phase 1: Execute resolve_* methods + AutoLoad
+            # Phase 1: Execute resolve_* methods + implicit auto-load
             auto_load_entries = self._scan_auto_load_fields(node, meta)
 
             resolve_tasks = []
@@ -669,7 +662,7 @@ class Resolver:
                     self._resolve_and_set(node, field_name, method, param_info)
                 )
 
-            # AutoLoad: auto-resolve fields without manual resolve_* methods
+            # Implicit auto-load: resolve fields matching relationships
             for field_name, rel_name, rel_info, field_info in auto_load_entries:
                 resolve_tasks.append(
                     self._auto_resolve_and_set(
