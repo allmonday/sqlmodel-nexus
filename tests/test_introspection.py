@@ -245,7 +245,8 @@ class TestIntrospectionGenerator:
         """Test is_introspection_query() method."""
         assert generator.is_introspection_query("{ __schema { types { name } } }")
         assert generator.is_introspection_query("{ __type(name: \"User\") { name } }")
-        assert not generator.is_introspection_query("{ users { id } __schema { queryType { name } } }")
+        mixed = "{ users { id } __schema { queryType { name } } }"
+        assert not generator.is_introspection_query(mixed)
         assert not generator.is_introspection_query("{ users { id } }")
 
 

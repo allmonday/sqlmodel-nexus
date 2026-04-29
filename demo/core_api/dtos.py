@@ -10,7 +10,6 @@ Level 4: ExposeAs + SendTo + Collector cross-layer flow (SprintDetail, TaskDetai
 Level 5: Custom __relationships__ + implicit auto-load (TaskWithTags, SprintWithTags)
 """
 
-from typing import Annotated
 
 from demo.core_api.models import Sprint, Tag, Task, User
 from sqlmodel_graphql import Collector, DefineSubset, SubsetConfig

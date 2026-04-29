@@ -124,7 +124,8 @@ def _extract_field_infos(
     field_definitions: dict[str, tuple[Any, FieldInfo]] = {}
 
     for field_name in field_names:
-        # Skip relationship fields — these will be handled via implicit auto-loading or manual resolve
+        # Skip relationship fields — handled via implicit auto-loading
+        # or manual resolve
         if field_name in relationship_names:
             continue
 

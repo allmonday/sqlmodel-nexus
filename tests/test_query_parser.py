@@ -100,8 +100,10 @@ class TestFieldValueTypes:
 
     def test_object_value(self):
         parser = QueryParser()
-        result = parser.parse('{ users { posts(filter: {name: "Alice", age: 30}) { id } } }')
-        assert result["users"].sub_fields["posts"].arguments["filter"] == {"name": "Alice", "age": 30}
+        q = '{ users { posts(filter: {name: "Alice", age: 30}) { id } } }'
+        result = parser.parse(q)
+        expected = {"name": "Alice", "age": 30}
+        assert result["users"].sub_fields["posts"].arguments["filter"] == expected
 
     def test_enum_value(self):
         parser = QueryParser()

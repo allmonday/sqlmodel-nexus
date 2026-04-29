@@ -194,11 +194,14 @@ class TestQueryExecutorBasic:
         query_methods = {"tasks": (FixtureTask, method)}
         parsed = QueryParser().parse("{ tasks { id title } }")
 
+        entities = [FixtureTask, FixtureUser, FixtureSprint]
         await executor.execute_query(
-            "{ tasks { id title } }", None, None, parsed, query_methods, {}, [FixtureTask, FixtureUser, FixtureSprint]
+            "{ tasks { id title } }", None, None,
+            parsed, query_methods, {}, entities,
         )
         await executor.execute_query(
-            "{ tasks { id title } }", None, None, parsed, query_methods, {}, [FixtureTask, FixtureUser, FixtureSprint]
+            "{ tasks { id title } }", None, None,
+            parsed, query_methods, {}, entities,
         )
 
         assert call_count == 2
@@ -240,8 +243,10 @@ class TestQueryExecutorSerialization:
         query_methods = {"users": (FixtureUser, method)}
         parsed = QueryParser().parse("{ users { id name } }")
 
+        entities = [FixtureUser, FixtureSprint, FixtureTask]
         result = await executor.execute_query(
-            "{ users { id name } }", None, None, parsed, query_methods, {}, [FixtureUser, FixtureSprint, FixtureTask]
+            "{ users { id name } }", None, None,
+            parsed, query_methods, {}, entities,
         )
 
         users = result["data"]["users"]

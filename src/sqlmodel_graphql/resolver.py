@@ -118,7 +118,9 @@ class _ClassMeta:
     collector_aliases: dict[str, bool] = field(default_factory=dict)
 
 
-def _analyze_method_params(method: Callable, *, include_collectors: bool = False) -> _MethodParamInfo:
+def _analyze_method_params(
+    method: Callable, *, include_collectors: bool = False,
+) -> _MethodParamInfo:
     """Analyze a method's signature and extract parameter metadata."""
     sig = inspect.signature(method)
     info = _MethodParamInfo()
@@ -306,7 +308,9 @@ class Resolver:
     # Implicit auto-loading — automatic relationship loading
     # ──────────────────────────────────────────────────────
 
-    def _scan_auto_load_fields(self, node: Any, meta: _ClassMeta) -> list[tuple[str, str, Any, Any]]:
+    def _scan_auto_load_fields(
+        self, node: Any, meta: _ClassMeta,
+    ) -> list[tuple[str, str, Any, Any]]:
         """Scan fields that should be auto-loaded from relationships.
 
         A field is auto-loaded when ALL of these conditions are met:

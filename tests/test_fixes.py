@@ -18,7 +18,6 @@ from sqlmodel_graphql.loader.registry import ErManager, _extract_sort_field
 from sqlmodel_graphql.relationship import Relationship
 from sqlmodel_graphql.resolver import Loader, Resolver, _class_meta_cache, _get_class_meta
 
-
 # ──────────────────────────────────────────────────────────
 # Issue 1+2: Resolver metadata caching
 # ──────────────────────────────────────────────────────────
