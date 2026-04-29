@@ -331,3 +331,173 @@ class TestQueryExecutorSerialization:
                 FieldSelection(arguments={"offset": -1}),
                 Rel(),
             )
+
+
+# ──────────────────────────────────────────────────────────
+# Split loader by type — GraphQL e2e tests
+# ──────────────────────────────────────────────────────────
+
+
+def _make_split_executor(session_factory=None) -> QueryExecutor:
+    """Build executor with split_loader_by_type=True."""
+    if session_factory is None:
+        session_factory = get_test_session_factory()
+    registry = LoaderRegistry(
+        entities=[FixtureUser, FixtureSprint, FixtureTask],
+        session_factory=session_factory,
+        split_loader_by_type=True,
+    )
+    return QueryExecutor(registry)
+
+
+class TestQueryExecutorSplitMode:
+    """GraphQL end-to-end tests for split_loader_by_type."""
+
+    @pytest.mark.usefixtures("test_db")
+    async def test_split_mode_returns_correct_results(self):
+        """Split mode should execute a relationship query correctly."""
+        executor = _make_split_executor()
+        session_factory = get_test_session_factory()
+
+        class TaskQuery(SQLModel, table=False):
+            @query
+            async def get_all(cls):
+                async with session_factory() as session:
+                    return list((await session.exec(select(FixtureTask))).all())
+
+        method = _get_bound_method(TaskQuery, "get_all")
+        query_methods = {"tasks": (FixtureTask, method)}
+        parsed = QueryParser().parse("{ tasks { id title owner { id name } } }")
+
+        result = await executor.execute_query(
+            "{ tasks { id title owner { id name } } }",
+            None, None, parsed, query_methods, {},
+            [FixtureTask, FixtureUser, FixtureSprint],
+        )
+
+        tasks = result["data"]["tasks"]
+        assert len(tasks) == 4
+        for task in tasks:
+            assert task["owner"] is not None
+            assert "id" in task["owner"]
+            assert "name" in task["owner"]
+
+    @pytest.mark.usefixtures("test_db")
+    async def test_split_mode_separate_loaders_for_different_selections(self):
+        """Two root queries accessing the same relationship with different
+        field selections should create separate loader instances in split mode,
+        each with its own _query_meta."""
+        executor = _make_split_executor()
+        session_factory = get_test_session_factory()
+        registry = executor._registry
+
+        class TaskQuery(SQLModel, table=False):
+            @query
+            async def get_all(cls):
+                async with session_factory() as session:
+                    return list((await session.exec(select(FixtureTask))).all())
+
+        method = _get_bound_method(TaskQuery, "get_all")
+        query_methods = {
+            "tasks": (FixtureTask, method),
+            "otherTasks": (FixtureTask, method),
+        }
+        gql = "{ tasks { owner { id name } } otherTasks { owner { id email } } }"
+        parsed = QueryParser().parse(gql)
+
+        result = await executor.execute_query(
+            gql, None, None, parsed, query_methods, {},
+            [FixtureTask, FixtureUser, FixtureSprint],
+        )
+
+        # Verify results are correct for both root fields
+        for task in result["data"]["tasks"]:
+            assert task["owner"] is not None
+            assert "name" in task["owner"]
+        for task in result["data"]["otherTasks"]:
+            assert task["owner"] is not None
+            assert "email" in task["owner"]
+
+        # Verify registry has 2 separate loader instances for owner M2O
+        rel_info = registry.get_relationship(FixtureTask, "owner")
+        loader_cls = rel_info.loader
+        inner = registry._loader_instances[loader_cls]
+        assert isinstance(inner, dict)  # split mode: nested dict
+        assert len(inner) == 2
+
+        type_keys = set(inner.keys())
+        assert frozenset({"id", "name"}) in type_keys
+        assert frozenset({"id", "email"}) in type_keys
+
+        # Each loader has its own _query_meta matching its type_key
+        for tk, loader in inner.items():
+            meta_fields = set(loader._query_meta["fields"])
+            assert meta_fields == tk
+
+    @pytest.mark.usefixtures("test_db")
+    async def test_split_mode_nested_relationships(self):
+        """Split mode with nested relationships (sprint -> tasks -> owner)."""
+        executor = _make_split_executor()
+        session_factory = get_test_session_factory()
+
+        class SprintQuery(SQLModel, table=False):
+            @query
+            async def get_all(cls):
+                async with session_factory() as session:
+                    return list((await session.exec(select(FixtureSprint))).all())
+
+        method = _get_bound_method(SprintQuery, "get_all")
+        query_methods = {"sprints": (FixtureSprint, method)}
+        parsed = QueryParser().parse(
+            "{ sprints { id name tasks { id title owner { id name } } } }"
+        )
+
+        result = await executor.execute_query(
+            "{ sprints { id name tasks { id title owner { id name } } } }",
+            None, None, parsed, query_methods, {},
+            [FixtureTask, FixtureUser, FixtureSprint],
+        )
+
+        sprints = result["data"]["sprints"]
+        assert len(sprints) == 2
+        for sprint in sprints:
+            assert "tasks" in sprint
+            for task in sprint["tasks"]:
+                assert task["owner"] is not None
+                assert "name" in task["owner"]
+
+    @pytest.mark.usefixtures("test_db")
+    async def test_default_mode_single_loader_with_merged_fields(self):
+        """Default mode uses a single shared loader instance whose _query_meta
+        fields reflect the queried selection."""
+        session_factory = get_test_session_factory()
+        registry = LoaderRegistry(
+            entities=[FixtureUser, FixtureSprint, FixtureTask],
+            session_factory=session_factory,
+            # split_loader_by_type=False (default)
+        )
+        executor = QueryExecutor(registry)
+
+        class TaskQuery(SQLModel, table=False):
+            @query
+            async def get_all(cls):
+                async with session_factory() as session:
+                    return list((await session.exec(select(FixtureTask))).all())
+
+        method = _get_bound_method(TaskQuery, "get_all")
+        query_methods = {"tasks": (FixtureTask, method)}
+        parsed = QueryParser().parse("{ tasks { owner { id name } } }")
+
+        await executor.execute_query(
+            "{ tasks { owner { id name } } }",
+            None, None, parsed, query_methods, {},
+            [FixtureTask, FixtureUser, FixtureSprint],
+        )
+
+        # Default mode: flat cache, single instance per loader_cls
+        rel_info = registry.get_relationship(FixtureTask, "owner")
+        loader_cls = rel_info.loader
+        instance = registry._loader_instances[loader_cls]
+        assert not isinstance(instance, dict)
+        meta_fields = set(instance._query_meta["fields"])
+        assert meta_fields == {"id", "name"}
