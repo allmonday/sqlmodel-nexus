@@ -33,15 +33,15 @@ from demo.core_api.dtos import (
     TaskSummary,
 )
 from demo.core_api.models import Sprint, Tag, Task, User
-from sqlmodel_nexus import ErDiagram, Resolver
-from sqlmodel_nexus.loader import ErManager
+from sqlmodel_nexus import ErDiagram, ErManager
 
 # ErManager inspects ORM metadata and creates DataLoaders for all
 # relationships between the provided entities.
-registry = ErManager(
+er = ErManager(
     entities=[User, Sprint, Task, Tag],
     session_factory=async_session,
 )
+Resolver = er.create_resolver()
 
 
 @asynccontextmanager
@@ -96,7 +96,7 @@ async def get_tasks():
                         owner_id=t.owner_id, done=t.done)
             for t in result.all()
         ]
-    return await Resolver(registry).resolve(tasks)
+    return await Resolver().resolve(tasks)
 
 
 @app.get("/api/sprints")
@@ -113,7 +113,7 @@ async def get_sprints():
             SprintSummary(id=s.id, name=s.name)
             for s in result.all()
         ]
-    return await Resolver(registry).resolve(sprints)
+    return await Resolver().resolve(sprints)
 
 
 @app.get("/api/sprints/{sprint_id}/detail")
@@ -133,7 +133,7 @@ async def get_sprint_detail(sprint_id: int):
             return {"error": "Sprint not found"}
 
     dto = SprintDetail(id=sprint.id, name=sprint.name)
-    result = await Resolver(registry).resolve(dto)
+    result = await Resolver().resolve(dto)
     return result
 
 
@@ -166,9 +166,13 @@ async def get_sprints_with_tags():
             SprintWithTags(id=s.id, name=s.name)
             for s in result.all()
         ]
-    return await Resolver(registry).resolve(sprints)
+    return await Resolver().resolve(sprints)
 
 
 if __name__ == "__main__":
+    import os
+
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+
+    port = int(os.environ.get("PORT", 8001))
+    uvicorn.run(app, host="0.0.0.0", port=port)

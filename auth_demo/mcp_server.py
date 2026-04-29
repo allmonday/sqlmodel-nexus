@@ -42,7 +42,7 @@ def main() -> None:
 
     # Get the underlying Starlette app and add auth middleware
     # Note: MCP uses streamable-http transport which creates a Starlette app
-    mcp_app = mcp.streamable_http_app()
+    mcp_app = mcp.http_app(transport="streamable-http")
     mcp_app.add_middleware(MCPAuthMiddleware)
 
     # Run with uvicorn
@@ -64,7 +64,8 @@ def main() -> None:
     print("Server starting on http://localhost:8001/mcp")
     print("=" * 60)
 
-    uvicorn.run(mcp_app, host="0.0.0.0", port=8001)
+    port = int(__import__("os").environ.get("PORT", 8001))
+    uvicorn.run(mcp_app, host="0.0.0.0", port=port)
 
 
 if __name__ == "__main__":

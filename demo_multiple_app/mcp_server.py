@@ -76,7 +76,8 @@ def main():
     print("=" * 60 + "\n")
 
     # Run the server (mcp.run() handles its own event loop)
-    mcp.run(transport="streamable-http")
+    port = int(__import__("os").environ.get("PORT", 8004))
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
 
 
 if __name__ == "__main__":
