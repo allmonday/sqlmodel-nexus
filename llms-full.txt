@@ -1,0 +1,439 @@
+# sqlmodel-graphql — LLM Reference
+
+> sqlmodel-graphql 从 SQLModel 类自动生成 GraphQL API。
+> 零配置 SDL 生成 + DataLoader 批量关系加载 + MCP 服务。
+
+版本：0.14.0 | Python >= 3.10 | 许可证：MIT
+
+---
+
+## 1. 概念映射
+
+| 用户概念 | 框架概念 | 代码入口 |
+|----------|----------|----------|
+| 定义数据模型 | SQLModel + Relationship | `class MyEntity(BaseEntity, table=True)` |
+| 暴露查询接口 | `@query` 装饰器 | `@query` on class method |
+| 暴露变更接口 | `@mutation` 装饰器 | `@mutation` on class method |
+| 自动 CRUD | `AutoQueryConfig` | `GraphQLHandler(auto_query_config=...)` |
+| 关系加载 | DataLoader 批量查询 | `session_factory` 参数 |
+| 列表分页 | ROW_NUMBER 窗口函数 | `enable_pagination=True` |
+| AI 集成 | MCP Server | `config_simple_mcp_server()` |
+| 交互调试 | GraphiQL | `handler.get_graphiql_html()` |
+
+---
+
+## 2. 安装
+
+```bash
+pip install sqlmodel-graphql
+pip install sqlmodel-graphql[fastmcp]  # 包含 MCP 支持
+```
+
+---
+
+## 3. API Reference
+
+### 3.1 `@query`
+
+将 class method 标记为 GraphQL 查询。
+
+```python
+from sqlmodel_graphql import query
+
+class User(BaseEntity, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+
+    @query
+    async def get_all(cls, limit: int = 10) -> list['User']:
+        """Docstring becomes GraphQL field description."""
+        async with get_session() as session:
+            return (await session.exec(select(cls).limit(limit))).all()
+```
+
+规则：
+- 第一个参数必须是 `cls`（自动转为 classmethod）
+- 返回类型决定 GraphQL 字段类型（`list[User]` → `[User!]!`，`Optional[User]` → `User`）
+- 方法参数成为 GraphQL 字段参数
+- docstring 成为字段描述
+- 生成的字段名：`{EntityName}{MethodName}`（如 `userGetAll`）
+
+### 3.2 `@mutation`
+
+与 `@query` 用法相同，标记为 GraphQL mutation。
+
+```python
+from sqlmodel_graphql import mutation
+
+class User(BaseEntity, table=True):
+    @mutation
+    async def create(cls, name: str, email: str) -> 'User':
+        """Create a new user."""
+        async with get_session() as session:
+            user = cls(name=name, email=email)
+            session.add(user)
+            await session.commit()
+            await session.refresh(user)
+            return user
+```
+
+支持 Input 类型参数：
+
+```python
+class CreateUserInput(BaseModel):
+    name: str
+    email: str
+
+class User(BaseEntity, table=True):
+    @mutation
+    async def create(cls, input: CreateUserInput) -> 'User':
+        ...
+```
+
+### 3.3 `GraphQLHandler`
+
+核心类，负责实体发现、SDL 生成、查询执行。
+
+```python
+from sqlmodel_graphql import GraphQLHandler, AutoQueryConfig
+
+handler = GraphQLHandler(
+    base=BaseEntity,                           # 必填：SQLModel 基类
+    session_factory=async_session,             # DataLoader 查询需要
+    enable_pagination=True,                    # 列表关系分页
+    auto_query_config=AutoQueryConfig(
+        session_factory=async_session,
+        default_limit=10,
+        generate_by_id=True,
+        generate_by_filter=True,
+    ),
+    query_description="My Query type",        # 可选
+    mutation_description="My Mutation type",   # 可选
+)
+```
+
+**参数说明：**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `base` | `type` | 是 | SQLModel 基类，用于实体发现 |
+| `session_factory` | `Callable | None` | 否 | 异步 session 工厂。关系加载必需 |
+| `enable_pagination` | `bool` | 否 | 启用列表关系分页，默认 False |
+| `auto_query_config` | `AutoQueryConfig | None` | 否 | 自动生成 by_id/by_filter 查询 |
+| `query_description` | `str | None` | 否 | Query 类型描述 |
+| `mutation_description` | `str | None` | 否 | Mutation 类型描述 |
+
+**方法：**
+
+```python
+# 执行 GraphQL 查询
+result: dict = await handler.execute(
+    query: str,
+    variables: dict | None = None,
+    operation_name: str | None = None,
+)
+# 返回 {"data": {...}} 或 {"data": {...}, "errors": [...]}
+
+# 获取 SDL
+sdl: str = handler.get_sdl()
+
+# 获取 GraphiQL 页面
+html: str = handler.get_graphiql_html(endpoint="/graphql")
+```
+
+### 3.4 `AutoQueryConfig`
+
+自动为所有实体生成标准查询。
+
+```python
+from sqlmodel_graphql import AutoQueryConfig
+
+config = AutoQueryConfig(
+    session_factory=async_session,    # 必填
+    default_limit=10,                 # by_filter 默认 limit
+    generate_by_id=True,              # 生成 by_id 查询
+    generate_by_filter=True,          # 生成 by_filter 查询
+    enabled=True,                     # 总开关
+)
+```
+
+**生成的查询（以 User 实体为例）：**
+
+| GraphQL 字段 | 签名 | 说明 |
+|-------------|------|------|
+| `userById` | `(id: Int!): User` | 按主键查单个 |
+| `userByFilter` | `(filter: UserFilterInput, limit: Int): [User!]!` | 按字段精确匹配过滤 |
+
+**FilterInput：** 自动生成，所有字段可选，仅非 None 值作为 WHERE 条件（精确匹配）。
+
+**约束：** `by_id` 要求实体有且仅有一个主键字段。复合主键实体会跳过 by_id。
+
+### 3.5 MCP 集成
+
+#### 单应用 MCP Server
+
+```python
+from sqlmodel_graphql.mcp import config_simple_mcp_server
+
+mcp = config_simple_mcp_server(
+    base=BaseEntity,
+    name="My API",
+    desc="API description",
+    allow_mutation=False,  # 只读模式
+)
+mcp.run()                    # stdio 模式
+# mcp.run(transport="streamable-http")  # HTTP 模式
+```
+
+提供 3 个工具：`get_schema()`、`graphql_query()`、`graphql_mutation()`
+
+#### 多应用 MCP Server
+
+```python
+from sqlmodel_graphql.mcp import create_mcp_server, AppConfig
+
+mcp = create_mcp_server(
+    apps=[
+        AppConfig(name="blog", base=BlogBase, description="Blog API"),
+        AppConfig(name="shop", base=ShopBase, description="Shop API"),
+    ],
+    name="Multi-App API",
+    allow_mutation=False,
+)
+mcp.run()
+```
+
+提供 8 个工具：`list_apps`、`list_queries`、`list_mutations`、`get_query_schema`、`get_mutation_schema`、`graphql_query`、`graphql_mutation`
+
+---
+
+## 4. 类型映射
+
+### Python → GraphQL
+
+| Python 类型 | GraphQL 类型 |
+|------------|-------------|
+| `int` | `Int!` |
+| `str` | `String!` |
+| `bool` | `Boolean!` |
+| `float` | `Float!` |
+| `Optional[int]` | `Int` |
+| `list[int]` | `[Int!]!` |
+| `list[User]`（Entity） | `[User!]!` |
+| `Optional[User]` | `User` |
+| `Enum` 子类 | `EnumName!` |
+| `SQLModel` 子类（参数中） | `InputName!` |
+
+### 分页类型（enable_pagination=True 时）
+
+列表关系自动包装为 Result 类型：
+
+```graphql
+type PostResult {
+  items: [Post!]!
+  pagination: Pagination!
+}
+
+type Pagination {
+  has_more: Boolean!
+  total_count: Int
+}
+```
+
+查询时传入 `limit` 和 `offset`：
+
+```graphql
+{
+  userGetAll {
+    posts(limit: 3, offset: 0) {
+      items { title }
+      pagination { has_more total_count }
+    }
+  }
+}
+```
+
+---
+
+## 5. 用法模式
+
+### 模式 A：最小可运行 GraphQL API
+
+```python
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
+from sqlmodel import SQLModel, Field, select
+from sqlmodel_graphql import query, GraphQLHandler
+
+class BaseEntity(SQLModel): pass
+
+class User(BaseEntity, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+
+    @query
+    async def get_all(cls) -> list['User']:
+        async with get_session() as session:
+            return (await session.exec(select(cls))).all()
+
+handler = GraphQLHandler(base=BaseEntity)
+
+class GraphQLRequest(BaseModel):
+    query: str
+
+app = FastAPI()
+
+@app.get("/graphql", response_class=HTMLResponse)
+async def graphiql():
+    return handler.get_graphiql_html()
+
+@app.post("/graphql")
+async def graphql(req: GraphQLRequest):
+    return await handler.execute(req.query)
+```
+
+### 模式 B：带关系的嵌套查询
+
+```python
+class User(BaseEntity, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+    posts: list["Post"] = Relationship(
+        back_populates="author",
+        sa_relationship_kwargs={"order_by": "Post.id"},
+    )
+
+class Post(BaseEntity, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    title: str
+    author_id: int = Field(foreign_key="user.id")
+    author: Optional[User] = Relationship(back_populates="posts")
+```
+
+查询示例：
+
+```graphql
+{
+  userGetAll(limit: 5) {
+    id
+    name
+    posts(limit: 3) {
+      items {
+        title
+        author { name }
+      }
+      pagination { has_more total_count }
+    }
+  }
+}
+```
+
+关系通过 DataLoader 自动批量加载，无需手动 eager loading。
+
+### 模式 C：AutoQueryConfig 零手写查询
+
+```python
+from sqlmodel_graphql import GraphQLHandler, AutoQueryConfig
+
+handler = GraphQLHandler(
+    base=BaseEntity,
+    session_factory=async_session,
+    auto_query_config=AutoQueryConfig(
+        session_factory=async_session,
+        default_limit=20,
+    ),
+    enable_pagination=True,
+)
+
+# 自动为所有 BaseEntity 子类生成：
+# - entityById(id: PK!): Entity
+# - entityByFilter(filter: EntityFilterInput, limit: Int): [Entity!]!
+```
+
+### 模式 D：MCP 服务
+
+```python
+from sqlmodel_graphql.mcp import config_simple_mcp_server
+
+mcp = config_simple_mcp_server(
+    base=BaseEntity,
+    name="My App API",
+    desc="Application description",
+    allow_mutation=True,
+)
+mcp.run()
+```
+
+AI 助手使用流程：
+1. `get_schema()` → 获取完整 SDL
+2. `graphql_query(query="...")` → 执行查询
+3. `graphql_mutation(mutation="...")` → 执行变更
+
+---
+
+## 6. 约束与限制
+
+| 约束 | 说明 |
+|------|------|
+| session_factory | DataLoader 关系加载需要 session_factory。不提供时，关系字段将无法加载 |
+| 列表关系分页 | 需要在 Relationship 上配置 `sa_relationship_kwargs={"order_by": "Entity.column"}` |
+| 单主键 | AutoQueryConfig 的 by_id 仅支持单主键实体 |
+| 精确匹配 | by_filter 仅支持字段精确匹配，复杂查询需自定义 @query 方法 |
+| snake_case 字段名 | 不会自动转为 camelCase |
+| @query 方法签名 | 第一个参数必须是 cls，装饰器自动转为 classmethod |
+| 实体发现 | 实体必须有 @query/@mutation 装饰器才会被主动发现。仅有 Relationship 引用的实体会被动纳入 |
+| Input 类型 | 方法参数中的 SQLModel/BaseModel 子类自动成为 GraphQL Input 类型 |
+
+---
+
+## 7. 实体发现机制
+
+GraphQLHandler 构造时执行实体发现：
+
+1. 扫描 `base` 的所有 SQLModel 子类
+2. 找到有 `@query` 或 `@mutation` 装饰器的类
+3. 递归遍历这些类的 `Relationship` 字段，纳入关联实体
+4. 为所有发现的实体生成 SDL 类型定义
+5. 为所有发现的实体创建 DataLoader（基于 SQLAlchemy inspect 的关系元数据）
+
+关系类型与 DataLoader 映射：
+
+| SQLAlchemy 关系方向 | DataLoader 类型 | SQL 模式 |
+|-------------------|----------------|---------|
+| MANYTOONE | `create_many_to_one_loader` | `WHERE target.id IN (:fk_values)` |
+| ONETOMANY（列表） | `create_one_to_many_loader` | `WHERE fk_col IN (:parent_ids)` |
+| ONETOMANY（标量） | `create_many_to_one_loader` | 同 MANYTOONE |
+| MANYTOMANY | `create_many_to_many_loader` | 通过关联表 JOIN |
+
+---
+
+## 8. 执行流程
+
+```
+GraphQL Query String
+       │
+       ├─ 内省查询 (__schema / __type)
+       │   → IntrospectionGenerator 直接处理
+       │
+       └─ 普通查询
+           │
+           ├─ 1. QueryParser.parse() → FieldSelection 树
+           ├─ 2. 找到 @query 方法，执行用户代码（只加载标量字段）
+           ├─ 3. resolve_relationships：逐层 DataLoader 批量加载
+           │     每一层收集所有 FK 值，一次 SQL 批量查询
+           └─ 4. 按请求字段序列化结果
+```
+
+分页 SQL（启用时）：
+
+```sql
+SELECT * FROM (
+    SELECT *, ROW_NUMBER() OVER (PARTITION BY fk_col ORDER BY sort_col) AS _rn,
+           COUNT(*) OVER (PARTITION BY fk_col) AS _tc
+    FROM target_table
+    WHERE fk_col IN (:fk_values)
+) sub WHERE _rn BETWEEN :start AND :end
+```
+
+一条 SQL 为所有父实体获取各自的分页数据。
