@@ -27,6 +27,27 @@ During early development, GraphQL's flexible queries let you rapidly verify enti
 
 > **Roadmap:** Auto-generation of FastAPI endpoints from the same SQLModel definitions is in progress. Today, GraphQL auto-generation and Core API (manual DTO) modes are production-ready.
 
+## Quick start
+
+One command to start all demo services:
+
+```bash
+bash start_all.sh
+```
+
+| Service | Port | URL |
+|---------|------|-----|
+| demo GraphQL | 8000 | http://localhost:8000/graphql |
+| demo CoreAPI | 8001 | http://localhost:8001/api/sprints |
+| auth GraphQL | 8002 | http://localhost:8002/graphql |
+| auth MCP | 8003 | http://localhost:8003/mcp |
+| multi-app MCP | 8004 | http://localhost:8004/mcp |
+| demo paginated | 8005 | http://localhost:8005/graphql |
+
+Press `Ctrl+C` to stop all services.
+
+To start individual services:
+
 ## Read This README in Order
 
 We reuse one example throughout: **Sprint → Task → User**.
@@ -403,6 +424,7 @@ pip install sqlmodel-nexus[fastmcp]
 ---
 
 ## Demo
+
 
 ```bash
 # GraphQL playground
