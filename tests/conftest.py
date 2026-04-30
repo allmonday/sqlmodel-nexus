@@ -54,6 +54,46 @@ class FixtureTask(FixtureBase, table=True):
 
 
 # ──────────────────────────────────────────────────────────
+# M2M test models (Article / Reader / ArticleReader)
+# ──────────────────────────────────────────────────────────
+
+
+class FixtureArticleReader(FixtureBase, table=True):
+    """Link table for Article <-> Reader many-to-many."""
+
+    __tablename__ = "test_article_reader"
+
+    article_id: int = Field(foreign_key="test_article.id", primary_key=True)
+    reader_id: int = Field(foreign_key="test_reader.id", primary_key=True)
+
+
+class FixtureReader(FixtureBase, table=True):
+    __tablename__ = "test_reader"
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+
+    articles: list["FixtureArticle"] = Relationship(
+        back_populates="readers",
+        link_model=FixtureArticleReader,
+        sa_relationship_kwargs={"order_by": "FixtureArticle.id"},
+    )
+
+
+class FixtureArticle(FixtureBase, table=True):
+    __tablename__ = "test_article"
+
+    id: int | None = Field(default=None, primary_key=True)
+    title: str
+
+    readers: list["FixtureReader"] = Relationship(
+        back_populates="articles",
+        link_model=FixtureArticleReader,
+        sa_relationship_kwargs={"order_by": "FixtureReader.id"},
+    )
+
+
+# ──────────────────────────────────────────────────────────
 # Database engine and session factory
 # ──────────────────────────────────────────────────────────
 
@@ -144,6 +184,60 @@ async def test_db():
     await seed_test_data()
     yield
     # Cleanup: drop tables to ensure isolation between tests
+    engine = _get_engine()
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.drop_all)
+
+
+async def seed_m2m_data():
+    """Insert M2M seed data: readers, articles, and link rows."""
+    session_factory = get_test_session_factory()
+    async with session_factory() as session:
+        # Check existing
+        result = await session.exec(select(FixtureReader))
+        if result.first():
+            return
+
+        readers = [
+            FixtureReader(name="Reader A"),
+            FixtureReader(name="Reader B"),
+            FixtureReader(name="Reader C"),
+        ]
+        for r in readers:
+            session.add(r)
+        await session.commit()
+        for r in readers:
+            await session.refresh(r)
+
+        articles = [
+            FixtureArticle(title="Article 1"),
+            FixtureArticle(title="Article 2"),
+        ]
+        for a in articles:
+            session.add(a)
+        await session.commit()
+        for a in articles:
+            await session.refresh(a)
+
+        # Link: Article 1 has Reader A and Reader B
+        #       Article 2 has Reader B and Reader C
+        links = [
+            FixtureArticleReader(article_id=articles[0].id, reader_id=readers[0].id),
+            FixtureArticleReader(article_id=articles[0].id, reader_id=readers[1].id),
+            FixtureArticleReader(article_id=articles[1].id, reader_id=readers[1].id),
+            FixtureArticleReader(article_id=articles[1].id, reader_id=readers[2].id),
+        ]
+        for link in links:
+            session.add(link)
+        await session.commit()
+
+
+@pytest_asyncio.fixture
+async def test_db_m2m():
+    """Create tables and seed M2M data (Article/Reader)."""
+    await init_test_db()
+    await seed_m2m_data()
+    yield
     engine = _get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.drop_all)

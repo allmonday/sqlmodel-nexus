@@ -234,7 +234,10 @@ def create_many_to_many_loader(
                 join_stmt = select(secondary_table).where(
                     getattr(secondary_table.c, secondary_local_col_name).in_(keys)
                 )
-                join_rows = (await session.exec(join_stmt)).all()
+                # Use session.execute() (not exec()) for raw Table queries.
+                # SQLModel's exec() unwraps multi-column rows into scalars,
+                # but we need proper Row objects to access columns by name.
+                join_rows = (await session.execute(join_stmt)).all()
 
                 target_keys = list(
                     {_row_get(row, secondary_remote_col_name) for row in join_rows}
@@ -524,7 +527,8 @@ def create_page_many_to_many_loader(
                 outer = select(subq).where(rn_col.between(start, end)).order_by(
                     sec_local_sub, sort_col_sub, pk_col_sub,
                 )
-                rows = (await session.exec(outer)).all()
+                # Use session.execute() for subquery/aggregate queries.
+                rows = (await session.execute(outer)).all()
 
                 grouped = defaultdict(list)
                 total_counts: dict[Any, int] = {}
@@ -544,7 +548,7 @@ def create_page_many_to_many_loader(
                     )
                     count_q = _apply_filters(count_q, filters)
                     count_q = count_q.group_by(sec_local_col)
-                    for row in (await session.exec(count_q)).all():
+                    for row in (await session.execute(count_q)).all():
                         total_counts[row[0]] = row[1]
 
                 return [

@@ -166,3 +166,124 @@ class TestLoaderClassNaming:
 
         assert "SG_" in LoaderCls.__name__
         assert "O2M" in LoaderCls.__name__
+
+
+def _get_secondary_table_and_columns():
+    """Extract secondary table and column names from FixtureArticle.readers M2M."""
+    from sqlalchemy import inspect
+
+    from tests.conftest import FixtureArticle, FixtureReader
+
+    mapper = inspect(FixtureArticle)
+    for rel in mapper.relationships:
+        if rel.key == "readers":
+            source_col, secondary_local_col = list(rel.synchronize_pairs)[0]
+            target_col, secondary_remote_col = list(rel.secondary_synchronize_pairs)[0]
+            return {
+                "secondary_table": rel.secondary,
+                "secondary_local_col_name": secondary_local_col.key,
+                "secondary_remote_col_name": secondary_remote_col.key,
+                "target_match_col_name": target_col.key,
+                "source_kls": FixtureArticle,
+                "target_kls": FixtureReader,
+            }
+    raise RuntimeError("readers relationship not found on FixtureArticle")
+
+
+class TestManyToManyLoader:
+    @pytest.mark.usefixtures("test_db_m2m")
+    async def test_batch_load_returns_correct_readers_per_article(self):
+        """M2M loader should resolve readers through the link table."""
+        from sqlmodel_nexus.loader.factories import create_many_to_many_loader
+
+        session_factory = get_test_session_factory()
+        meta = _get_secondary_table_and_columns()
+
+        LoaderCls = create_many_to_many_loader(
+            source_kls=meta["source_kls"],
+            rel_name="readers",
+            target_kls=meta["target_kls"],
+            secondary_table=meta["secondary_table"],
+            secondary_local_col_name=meta["secondary_local_col_name"],
+            secondary_remote_col_name=meta["secondary_remote_col_name"],
+            target_match_col_name=meta["target_match_col_name"],
+            session_factory=session_factory,
+        )
+
+        loader = LoaderCls()
+
+        # Article 1 has Reader A (id=1) and Reader B (id=2)
+        # Article 2 has Reader B (id=2) and Reader C (id=3)
+        result = await loader.load_many([1, 2])
+
+        assert len(result) == 2
+        assert len(result[0]) == 2  # Article 1 -> 2 readers
+        assert len(result[1]) == 2  # Article 2 -> 2 readers
+
+        names_0 = sorted(r.name for r in result[0])
+        names_1 = sorted(r.name for r in result[1])
+        assert names_0 == ["Reader A", "Reader B"]
+        assert names_1 == ["Reader B", "Reader C"]
+
+    @pytest.mark.usefixtures("test_db_m2m")
+    async def test_batch_load_empty_for_no_links(self):
+        """M2M loader should return empty list for article with no readers."""
+        from sqlmodel_nexus.loader.factories import create_many_to_many_loader
+
+        session_factory = get_test_session_factory()
+        meta = _get_secondary_table_and_columns()
+
+        LoaderCls = create_many_to_many_loader(
+            source_kls=meta["source_kls"],
+            rel_name="readers",
+            target_kls=meta["target_kls"],
+            secondary_table=meta["secondary_table"],
+            secondary_local_col_name=meta["secondary_local_col_name"],
+            secondary_remote_col_name=meta["secondary_remote_col_name"],
+            target_match_col_name=meta["target_match_col_name"],
+            session_factory=session_factory,
+        )
+
+        loader = LoaderCls()
+        result = await loader.load_many([999])
+
+        assert result == [[]]
+
+    @pytest.mark.usefixtures("test_db_m2m")
+    async def test_batch_load_reverse_direction(self):
+        """M2M loader should work in reverse direction (reader -> articles)."""
+        from sqlalchemy import inspect
+
+        from sqlmodel_nexus.loader.factories import create_many_to_many_loader
+        from tests.conftest import FixtureArticle, FixtureReader
+
+        session_factory = get_test_session_factory()
+
+        # Inspect the reverse relationship
+        mapper = inspect(FixtureReader)
+        for rel in mapper.relationships:
+            if rel.key == "articles":
+                source_col, secondary_local_col = list(rel.synchronize_pairs)[0]
+                target_col, secondary_remote_col = list(rel.secondary_synchronize_pairs)[0]
+
+                LoaderCls = create_many_to_many_loader(
+                    source_kls=FixtureReader,
+                    rel_name="articles",
+                    target_kls=FixtureArticle,
+                    secondary_table=rel.secondary,
+                    secondary_local_col_name=secondary_local_col.key,
+                    secondary_remote_col_name=secondary_remote_col.key,
+                    target_match_col_name=target_col.key,
+                    session_factory=session_factory,
+                )
+                break
+
+        loader = LoaderCls()
+
+        # Reader B (id=2) has both Article 1 and Article 2
+        result = await loader.load_many([2])
+
+        assert len(result) == 1
+        assert len(result[0]) == 2
+        titles = sorted(a.title for a in result[0])
+        assert titles == ["Article 1", "Article 2"]
