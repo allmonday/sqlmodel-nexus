@@ -21,8 +21,9 @@ PORT_CORE_API=8001
 PORT_AUTH_GQL=8002
 PORT_AUTH_MCP=8003
 PORT_MULTI_MCP=8004
+PORT_PAG=8005
 
-ALL_PORTS=($PORT_DEMO $PORT_CORE_API $PORT_AUTH_GQL $PORT_AUTH_MCP $PORT_MULTI_MCP)
+ALL_PORTS=($PORT_DEMO $PORT_CORE_API $PORT_AUTH_GQL $PORT_AUTH_MCP $PORT_MULTI_MCP $PORT_PAG)
 
 PIDS=()
 
@@ -92,6 +93,10 @@ echo -e "${BLUE}Starting${NC} multi-app MCP on port $PORT_MULTI_MCP"
 PORT=$PORT_MULTI_MCP uv run python -m demo_multiple_app.mcp_server &
 PIDS+=($!)
 
+echo -e "${BLUE}Starting${NC} demo GraphQL (paginated) on port $PORT_PAG"
+uv run uvicorn demo.app_paginated:app --port $PORT_PAG &
+PIDS+=($!)
+
 echo ""
 
 # Wait for all services to be ready
@@ -101,6 +106,7 @@ wait_for_port $PORT_CORE_API "demo CoreAPI" || true
 wait_for_port $PORT_AUTH_GQL "auth GraphQL" || true
 wait_for_port $PORT_AUTH_MCP "auth MCP"     || true
 wait_for_port $PORT_MULTI_MCP "multi-app MCP" || true
+wait_for_port $PORT_PAG "demo paginated"     || true
 
 echo ""
 
@@ -115,6 +121,7 @@ printf "  %-20s %-8s %s\n" "demo CoreAPI" "$PORT_CORE_API" "http://localhost:$PO
 printf "  %-20s %-8s %s\n" "auth GraphQL" "$PORT_AUTH_GQL" "http://localhost:$PORT_AUTH_GQL/graphql"
 printf "  %-20s %-8s %s\n" "auth MCP" "$PORT_AUTH_MCP" "http://localhost:$PORT_AUTH_MCP/mcp"
 printf "  %-20s %-8s %s\n" "multi-app MCP" "$PORT_MULTI_MCP" "http://localhost:$PORT_MULTI_MCP/mcp"
+printf "  %-20s %-8s %s\n" "demo paginated" "$PORT_PAG" "http://localhost:$PORT_PAG/graphql"
 echo "=============================================="
 echo ""
 echo -e "${YELLOW}Press Ctrl+C to stop all services${NC}"
