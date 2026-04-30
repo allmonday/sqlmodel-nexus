@@ -6,6 +6,7 @@ with three-layer progressive disclosure for reduced context usage.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from sqlmodel_nexus.mcp.managers import MultiAppManager
@@ -122,6 +123,7 @@ def config_simple_mcp_server(
     name: str = "SQLModel Nexus API",
     desc: str | None = None,
     allow_mutation: bool = False,
+    session_factory: Callable | None = None,
 ) -> FastMCP:
     """Create a simplified MCP server for single-app scenarios.
 
@@ -146,6 +148,8 @@ def config_simple_mcp_server(
               Query and Mutation type descriptions).
         allow_mutation: If True, registers graphql_mutation tool and includes
             Mutation type in schema. Default is False (read-only mode).
+        session_factory: Async session factory for DataLoader relationship
+            loading. Required if queries return entities with relationships.
 
     Returns:
         A configured FastMCP server instance with 2-3 simplified tools.
@@ -198,7 +202,7 @@ def config_simple_mcp_server(
     from sqlmodel_nexus.mcp.tools.simple_tools import register_simple_tools
 
     # Create the single-app manager
-    manager = SingleAppManager(base=base, description=desc)
+    manager = SingleAppManager(base=base, description=desc, session_factory=session_factory)
 
     # Create the FastMCP server
     mcp = FastMCP(name)

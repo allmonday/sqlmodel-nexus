@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from sqlmodel_nexus.handler import GraphQLHandler
@@ -27,6 +28,7 @@ class SingleAppManager:
         self,
         base: type[SQLModel],
         description: str | None = None,
+        session_factory: Callable | None = None,
     ):
         """Initialize the single-app manager.
 
@@ -35,6 +37,7 @@ class SingleAppManager:
                   decorators will be automatically discovered.
             description: Optional description for the GraphQL schema
                         (used for both Query and Mutation type descriptions)
+            session_factory: Async session factory for DataLoader relationship loading
 
         Example:
             ```python
@@ -56,6 +59,7 @@ class SingleAppManager:
         # Create GraphQL handler for this app
         self.handler = GraphQLHandler(
             base=base,
+            session_factory=session_factory,
             query_description=description,
             mutation_description=description,
         )

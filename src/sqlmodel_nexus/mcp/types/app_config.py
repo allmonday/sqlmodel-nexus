@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
@@ -15,6 +16,7 @@ class AppConfig(TypedDict, total=False):
         name: Unique identifier for the application (e.g., "blog", "shop")
         base: SQLModel base class for this application
         description: Human-readable description of the application
+        session_factory: Async session factory for DataLoader relationship loading
         query_description: Description for the Query type in GraphQL schema
         mutation_description: Description for the Mutation type in GraphQL schema
     """
@@ -22,5 +24,6 @@ class AppConfig(TypedDict, total=False):
     name: str
     base: type[SQLModel]
     description: str | None
+    session_factory: Callable | None
     query_description: str | None
     mutation_description: str | None

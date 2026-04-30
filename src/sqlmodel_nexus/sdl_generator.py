@@ -97,6 +97,8 @@ class SDLGenerator:
         self._converter = TypeConverter(self._entity_names)
         self._query_description = query_description
         self._mutation_description = mutation_description
+        self._enable_pagination = False
+        self._loader_registry: Any = None
 
     def generate(
         self,

@@ -18,6 +18,7 @@ import asyncio
 
 from sqlmodel_nexus.mcp import create_mcp_server
 
+from .database import blog_async_session, shop_async_session
 from .models import BlogBaseEntity, ShopBaseEntity
 
 
@@ -33,6 +34,7 @@ def main():
         {
             "name": "blog",
             "base": BlogBaseEntity,
+            "session_factory": blog_async_session,
             "description": "Blog system API - Manage users and posts",
             "query_description": "Query users and posts",
             "mutation_description": "Create users and posts",
@@ -40,6 +42,7 @@ def main():
         {
             "name": "shop",
             "base": ShopBaseEntity,
+            "session_factory": shop_async_session,
             "description": "E-commerce system API - Manage products and orders",
             "query_description": "Query products and orders",
             "mutation_description": "Create products, orders, and order items",

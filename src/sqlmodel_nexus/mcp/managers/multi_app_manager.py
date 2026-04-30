@@ -56,6 +56,7 @@ class MultiAppManager:
         # Create GraphQL handler for this app
         handler = GraphQLHandler(
             base=config["base"],
+            session_factory=config.get("session_factory"),
             query_description=config.get("query_description"),
             mutation_description=config.get("mutation_description"),
         )
