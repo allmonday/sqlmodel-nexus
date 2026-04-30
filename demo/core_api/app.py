@@ -7,6 +7,7 @@ Demonstrates sqlmodel-nexus's Core API mode:
 - ExposeAs/SendTo/Collector: cross-layer data flow
 - __relationships__: custom non-ORM relationships with hand-written loaders
 - ErDiagram: Mermaid ER diagram generation
+- build_dto_select: generate column-select statements from DTO definitions
 
 Run:
     uv run uvicorn demo.core_api.app:app --reload
@@ -23,7 +24,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlmodel import select
 
 from demo.core_api.database import async_session, init_db
 from demo.core_api.dtos import (
@@ -33,7 +33,7 @@ from demo.core_api.dtos import (
     TaskSummary,
 )
 from demo.core_api.models import Sprint, Tag, Task, User
-from sqlmodel_nexus import ErDiagram, ErManager
+from sqlmodel_nexus import ErDiagram, ErManager, build_dto_select
 
 # ErManager inspects ORM metadata and creates DataLoaders for all
 # relationships between the provided entities.
@@ -85,18 +85,14 @@ async def root():
 async def get_tasks():
     """Level 2: resolve_* + Loader — load related data via DataLoader.
 
-    Each TaskSummary has a resolve_owner method that calls
-    loader.load(self.owner_id). The DataLoader batches all owner_id
-    values and executes a single query.
+    build_dto_select generates a select statement with only the columns
+    TaskSummary needs. Results are converted to DTOs via dict(row._mapping).
     """
+    stmt = build_dto_select(TaskSummary)
     async with async_session() as session:
-        result = await session.exec(select(Task))
-        tasks = [
-            TaskSummary(id=t.id, title=t.title, sprint_id=t.sprint_id,
-                        owner_id=t.owner_id, done=t.done)
-            for t in result.all()
-        ]
-    return await Resolver().resolve(tasks)
+        rows = (await session.exec(stmt)).all()
+    dtos = [TaskSummary(**dict(row._mapping)) for row in rows]
+    return await Resolver().resolve(dtos)
 
 
 @app.get("/api/sprints")
@@ -107,13 +103,11 @@ async def get_sprints():
     then each TaskSummary.resolve_owner loads owners,
     then post_task_count and post_contributor_names run.
     """
+    stmt = build_dto_select(SprintSummary)
     async with async_session() as session:
-        result = await session.exec(select(Sprint))
-        sprints = [
-            SprintSummary(id=s.id, name=s.name)
-            for s in result.all()
-        ]
-    return await Resolver().resolve(sprints)
+        rows = (await session.exec(stmt)).all()
+    dtos = [SprintSummary(**dict(row._mapping)) for row in rows]
+    return await Resolver().resolve(dtos)
 
 
 @app.get("/api/sprints/{sprint_id}/detail")
@@ -124,17 +118,13 @@ async def get_sprint_detail(sprint_id: int):
     - TaskDetail.post_full_title reads sprint_name from ancestor_context
     - TaskDetail.owner is collected by SprintDetail.post_contributors
     """
+    stmt = build_dto_select(SprintDetail, where=Sprint.id == sprint_id)
     async with async_session() as session:
-        result = await session.exec(
-            select(Sprint).where(Sprint.id == sprint_id)
-        )
-        sprint = result.first()
-        if sprint is None:
-            return {"error": "Sprint not found"}
-
-    dto = SprintDetail(id=sprint.id, name=sprint.name)
-    result = await Resolver().resolve(dto)
-    return result
+        rows = (await session.exec(stmt)).all()
+    if not rows:
+        return {"error": "Sprint not found"}
+    dto = SprintDetail(**dict(rows[0]._mapping))
+    return await Resolver().resolve(dto)
 
 
 @app.get("/api/er-diagram")
@@ -160,13 +150,11 @@ async def get_sprints_with_tags():
       loaded via a hand-written async batch loader
     - post_tag_count: derived field counting custom-loaded tags
     """
+    stmt = build_dto_select(SprintWithTags)
     async with async_session() as session:
-        result = await session.exec(select(Sprint))
-        sprints = [
-            SprintWithTags(id=s.id, name=s.name)
-            for s in result.all()
-        ]
-    return await Resolver().resolve(sprints)
+        rows = (await session.exec(stmt)).all()
+    dtos = [SprintWithTags(**dict(row._mapping)) for row in rows]
+    return await Resolver().resolve(dtos)
 
 
 if __name__ == "__main__":

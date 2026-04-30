@@ -813,3 +813,152 @@ class TestSubsetConfigIntegration:
         for sprint_dto in result:
             assert len(sprint_dto.all_titles) == len(sprint_dto.tasks)
             assert all(isinstance(t, str) for t in sprint_dto.all_titles)
+
+
+# ──────────────────────────────────────────────────────────
+# Test: build_dto_select
+# ──────────────────────────────────────────────────────────
+
+
+class TestBuildDtoSelect:
+    def test_basic_column_selection(self):
+        """build_dto_select should select only the DTO's subset columns."""
+        from sqlmodel_nexus.subset import SubsetConfig, build_dto_select
+
+        class UserSub(DefineSubset):
+            __subset__ = SubsetConfig(kls=FixtureUser, fields=["id", "name"])
+
+        stmt = build_dto_select(UserSub)
+
+        # Verify the statement's columns match subset fields
+        cols = {c.name for c in stmt.selected_columns}
+        assert cols == {"id", "name"}
+
+    def test_fk_field_included_in_select(self):
+        """FK fields should appear in the select statement."""
+        from sqlmodel_nexus.subset import SubsetConfig, build_dto_select
+
+        class TaskSub(DefineSubset):
+            __subset__ = SubsetConfig(
+                kls=FixtureTask, fields=["id", "title", "owner_id"],
+            )
+
+        stmt = build_dto_select(TaskSub)
+        cols = {c.name for c in stmt.selected_columns}
+        assert cols == {"id", "title", "owner_id"}
+
+    def test_relationship_fields_filtered(self):
+        """Relationship field names should be excluded from the select."""
+        from sqlmodel_nexus.subset import SubsetConfig, build_dto_select
+
+        # FixtureTask has 'sprint' and 'owner' as relationship fields
+        class TaskSub(DefineSubset):
+            __subset__ = SubsetConfig(kls=FixtureTask, fields=["id", "title"])
+
+        stmt = build_dto_select(TaskSub)
+        cols = {c.name for c in stmt.selected_columns}
+        # Only scalar columns, no relationship names
+        assert "sprint" not in cols
+        assert "owner" not in cols
+        assert cols == {"id", "title"}
+
+    def test_with_where_clause(self):
+        """build_dto_select with where should include the filter."""
+        from sqlmodel_nexus.subset import SubsetConfig, build_dto_select
+
+        class UserSub(DefineSubset):
+            __subset__ = SubsetConfig(kls=FixtureUser, fields=["id", "name"])
+
+        stmt = build_dto_select(UserSub, where=FixtureUser.id == 1)
+        compiled = stmt.compile(compile_kwargs={"literal_binds": True})
+        assert "id = 1" in str(compiled).lower() or "WHERE" in str(compiled)
+
+    def test_non_define_subset_raises(self):
+        """Passing a non-DefineSubset class should raise ValueError."""
+        from sqlmodel_nexus.subset import build_dto_select
+
+        with pytest.raises(ValueError, match="not a DefineSubset DTO"):
+            build_dto_select(BaseModel)
+
+    def test_plain_pydantic_model_raises(self):
+        """A plain Pydantic model without __subset_fields__ should raise."""
+        from sqlmodel_nexus.subset import build_dto_select
+
+        class MyModel(BaseModel):
+            x: int
+
+        with pytest.raises(ValueError, match="not a DefineSubset DTO"):
+            build_dto_select(MyModel)
+
+    @pytest.mark.usefixtures("test_db")
+    async def test_end_to_end_query_and_conversion(self):
+        """build_dto_select should produce a statement that works with session.exec."""
+        from sqlmodel_nexus.subset import SubsetConfig, build_dto_select
+
+        class TaskSub(DefineSubset):
+            __subset__ = SubsetConfig(
+                kls=FixtureTask, fields=["id", "title", "owner_id"],
+            )
+
+        stmt = build_dto_select(TaskSub)
+        session_factory = get_test_session_factory()
+
+        async with session_factory() as session:
+            rows = (await session.exec(stmt)).all()
+
+        dtos = [TaskSub(**dict(row._mapping)) for row in rows]
+        assert len(dtos) > 0
+        for dto in dtos:
+            assert dto.id is not None
+            assert dto.title is not None
+            assert dto.owner_id is not None
+
+    @pytest.mark.usefixtures("test_db")
+    async def test_with_where_returns_subset(self):
+        """build_dto_select with where should filter results."""
+        from sqlmodel_nexus.subset import SubsetConfig, build_dto_select
+
+        class UserSub(DefineSubset):
+            __subset__ = SubsetConfig(kls=FixtureUser, fields=["id", "name"])
+
+        stmt = build_dto_select(UserSub, where=FixtureUser.name == "Alice")
+        session_factory = get_test_session_factory()
+
+        async with session_factory() as session:
+            rows = (await session.exec(stmt)).all()
+
+        dtos = [UserSub(**dict(row._mapping)) for row in rows]
+        assert len(dtos) == 1
+        assert dtos[0].name == "Alice"
+
+    @pytest.mark.usefixtures("test_db")
+    async def test_with_resolver_integration(self):
+        """build_dto_select + dict(row._mapping) + Resolver should work end-to-end."""
+        from sqlmodel_nexus.loader.registry import ErManager
+        from sqlmodel_nexus.resolver import Resolver
+        from sqlmodel_nexus.subset import SubsetConfig, build_dto_select
+
+        class UserSub(DefineSubset):
+            __subset__ = SubsetConfig(kls=FixtureUser, fields=["id", "name"])
+
+        class TaskSub(DefineSubset):
+            __subset__ = SubsetConfig(
+                kls=FixtureTask, fields=["id", "title", "owner_id"],
+            )
+            owner: UserSub | None = None
+
+        session_factory = get_test_session_factory()
+        registry = ErManager(
+            entities=[FixtureUser, FixtureTask, FixtureSprint],
+            session_factory=session_factory,
+        )
+
+        stmt = build_dto_select(TaskSub)
+        async with session_factory() as session:
+            rows = (await session.exec(stmt)).all()
+        dtos = [TaskSub(**dict(row._mapping)) for row in rows]
+
+        result = await Resolver(registry).resolve(dtos)
+        for dto in result:
+            assert dto.owner is not None
+            assert dto.owner.name in {"Alice", "Bob"}

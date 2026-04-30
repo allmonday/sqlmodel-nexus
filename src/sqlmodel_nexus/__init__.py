@@ -66,7 +66,7 @@ from sqlmodel_nexus.relationship import Relationship
 from sqlmodel_nexus.resolver import Loader
 from sqlmodel_nexus.sdl_generator import SDLGenerator
 from sqlmodel_nexus.standard_queries import AutoQueryConfig, add_standard_queries
-from sqlmodel_nexus.subset import DefineSubset, SubsetConfig
+from sqlmodel_nexus.subset import DefineSubset, SubsetConfig, build_dto_select
 
 __all__ = [
     # Version
@@ -94,4 +94,6 @@ __all__ = [
     # Custom relationships
     "Relationship",
     "ErDiagram",
+    # Query builder
+    "build_dto_select",
 ]

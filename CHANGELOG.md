@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.1
+
+### New Features
+
+- **`build_dto_select`** — new public function that generates a `select(*columns)` statement from a DefineSubset DTO, querying only the scalar columns the DTO needs. Relationship field names are filtered automatically. Accepts an optional `where` parameter for SQLAlchemy filter expressions.
+
+### Documentation & Demos
+
+- Simplify Core API demo endpoints to use `build_dto_select` + `dict(row._mapping)` pattern instead of manual field-by-field DTO construction.
+
 ## 1.1.0
 
 ### New Features

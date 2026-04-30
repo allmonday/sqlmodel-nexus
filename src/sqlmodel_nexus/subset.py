@@ -602,3 +602,63 @@ class DefineSubset(metaclass=SubsetMeta):
                 return len(self.title.split())
     """
     pass
+
+
+# ──────────────────────────────────────────────────────────
+# Query builder — select only the columns a DTO needs
+# ──────────────────────────────────────────────────────────
+
+def build_dto_select(
+    dto_cls: type[BaseModel],
+    where: Any | None = None,
+):
+    """Build a ``select(*columns)`` statement for a DefineSubset DTO.
+
+    Reads the DTO's ``__subset_fields__`` and source entity to produce
+    a statement that queries only the scalar columns the DTO needs.
+    Relationship field names are filtered out automatically.
+
+    Args:
+        dto_cls: A DefineSubset DTO class.
+        where: Optional SQLAlchemy where expression
+            (e.g. ``Sprint.id == 1``).
+
+    Returns:
+        A SQLModel/SQLAlchemy ``Select`` statement.
+
+    Raises:
+        ValueError: If *dto_cls* is not a DefineSubset DTO.
+
+    Usage::
+
+        from sqlmodel_nexus import build_dto_select
+
+        stmt = build_dto_select(TaskSummary)
+        async with session_factory() as session:
+            rows = (await session.exec(stmt)).all()
+        dtos = [TaskSummary(**dict(row._mapping)) for row in rows]
+    """
+    from sqlmodel import select
+
+    entity_cls = get_subset_source(dto_cls)
+    if entity_cls is None:
+        raise ValueError(
+            f"{dto_cls.__name__} is not a DefineSubset DTO "
+            f"(no source entity registered)"
+        )
+
+    subset_fields = getattr(dto_cls, "__subset_fields__", None)
+    if not subset_fields:
+        raise ValueError(
+            f"{dto_cls.__name__} has no __subset_fields__"
+        )
+
+    # Filter out relationship field names — they are not table columns
+    rel_names = _get_all_relationship_names(entity_cls)
+    column_fields = [f for f in subset_fields if f not in rel_names]
+    columns = [getattr(entity_cls, f) for f in column_fields]
+
+    stmt = select(*columns)
+    if where is not None:
+        stmt = stmt.where(where)
+    return stmt
