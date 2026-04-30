@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.1.0
+
+### New Features
+
+- **`Relationship.target` supports `list[Entity]`** — one-to-many relationships can now use `target=list[Entity]` instead of the separate `is_list=True` flag. The `is_list` attribute becomes a computed property derived from the target type. A new `target_entity` property extracts the bare entity class, stripping the `list[...]` wrapper.
+- **Many-to-many relationship support** — added `Article`/`Reader` many-to-many test fixtures in `conftest.py` and comprehensive loader factory tests covering `create_many_to_many_loader` and `create_page_many_to_many_loader`.
+- **MCP supports `session_factory`** — `AppConfig` and `SingleAppManager` now accept an optional `session_factory` parameter, which is forwarded to `GraphQLHandler` to enable DataLoader relationship loading in MCP services.
+
+### Bug Fixes
+
+- **Many-to-many loader queries use `session.execute()`** — replaced `session.exec()` with `session.execute()` for raw `Table` and subquery/aggregate queries in `create_many_to_many_loader` and `create_page_many_to_many_loader`. `exec()` unwraps multi-column rows into scalars, which loses column data needed for join table resolution.
+
+### Documentation & Demos
+
+- Add `CLAUDE.md` and `llms-full.txt` for project-level AI context.
+- Add paginated GraphQL demo application (`demo/app_paginated.py`).
+- Update `start_all.sh` to include the new paginated demo service.
+
+
 ## 1.0.0
 
 ### New Public API: Core API Mode
