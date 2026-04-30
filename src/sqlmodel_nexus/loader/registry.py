@@ -294,7 +294,7 @@ def _build_custom_relationship_info(rel: Relationship) -> RelationshipInfo:
         name=rel.name,
         direction="CUSTOM",
         fk_field=rel.fk,
-        target_entity=rel.target,
+        target_entity=rel.target_entity,
         is_list=rel.is_list,
         loader=_CustomLoader,
     )

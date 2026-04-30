@@ -461,8 +461,8 @@ class Resolver:
         is_custom = getattr(rel_info, "direction", "") == "CUSTOM"
 
         if rel_info.is_list:
-            # One-to-many / many-to-many: load by PK
-            pk_value = getattr(node, "id", None)
+            # One-to-many / many-to-many: load by source key
+            pk_value = getattr(node, rel_info.fk_field, None)
             if pk_value is None:
                 return
             results = await loader.load(pk_value)

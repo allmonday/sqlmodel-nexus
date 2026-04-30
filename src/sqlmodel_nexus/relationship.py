@@ -14,10 +14,9 @@ Usage:
         __relationships__ = [
             Relationship(
                 fk='id',
-                target=Tag,
+                target=list[Tag],
                 name='tags',
                 loader=tags_by_post_id_loader,
-                is_list=True,
             )
         ]
         id: int | None = Field(default=None, primary_key=True)
@@ -28,6 +27,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any, get_args, get_origin
 
 from sqlmodel import SQLModel
 
@@ -37,27 +37,40 @@ class Relationship:
     """Defines a custom (non-ORM) relationship for a SQLModel entity.
 
     Args:
-        fk: FK field name on the source entity. For many-to-one, this is the
-            actual FK column (e.g. 'owner_id'). For one-to-many (is_list=True),
-            this is the source entity's PK field (typically 'id').
-        target: Target SQLModel entity class. Used for type checking and
-            ER diagram generation.
+        fk: Field name on the source entity whose value is passed to the
+            loader as the batch key. For many-to-one this is typically the
+            FK column (e.g. ``'owner_id'``); for one-to-many it is the
+            source entity's PK (e.g. ``'id'``).
+        target: Target entity type. Use a plain class for scalar (many-to-one)
+            relationships, or ``list[Entity]`` for collection (one-to-many)
+            relationships. Examples: ``target=User`` or ``target=list[Tag]``.
         name: Unique relationship name within this entity. Becomes the lookup
-            key in LoaderRegistry and auto-loading.
-        loader: Async batch loader function. Signature varies by is_list:
-            - is_list=False: ``async def fn(keys: list[K]) -> list[V | None]``
-            - is_list=True:  ``async def fn(keys: list[K]) -> list[list[V]]``
-        is_list: True for one-to-many style relationships where one source
-            entity maps to multiple target entities.
+            key in ErManager and auto-loading.
+        loader: Async batch loader function. Signature varies by target:
+            - scalar target: ``async def fn(keys: list[K]) -> list[V | None]``
+            - list target:   ``async def fn(keys: list[K]) -> list[list[V]]``
         description: Optional description for ER diagram documentation.
     """
 
     fk: str
-    target: type[SQLModel]
+    target: Any
     name: str
     loader: Callable
-    is_list: bool = False
     description: str | None = None
+
+    @property
+    def is_list(self) -> bool:
+        """True if target is ``list[Entity]`` (one-to-many relationship)."""
+        return get_origin(self.target) is list
+
+    @property
+    def target_entity(self) -> type[SQLModel]:
+        """Extract the bare entity class, stripping ``list[...]`` wrapper."""
+        if self.is_list:
+            args = get_args(self.target)
+            if args:
+                return args[0]
+        return self.target
 
 
 def get_custom_relationships(entity: type[SQLModel]) -> list[Relationship]:

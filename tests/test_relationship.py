@@ -38,10 +38,9 @@ class Post(SQLModel, table=True):
     __relationships__ = [
         Relationship(
             fk="id",
-            target=Tag,
+            target=list[Tag],
             name="tags",
             loader=_dummy_tag_loader,
-            is_list=True,
             description="Post tags via custom loader",
         )
     ]
@@ -100,6 +99,7 @@ class TestRelationshipDataclass:
         )
         assert rel.fk == "author_id"
         assert rel.target is RelUser
+        assert rel.target_entity is RelUser
         assert rel.name == "author"
         assert rel.loader is _dummy_tag_loader
         assert rel.is_list is False
@@ -109,13 +109,13 @@ class TestRelationshipDataclass:
         """Relationship should handle all optional fields."""
         rel = Relationship(
             fk="id",
-            target=Tag,
+            target=list[Tag],
             name="tags",
             loader=_dummy_tag_loader,
-            is_list=True,
             description="Tags",
         )
         assert rel.is_list is True
+        assert rel.target_entity is Tag
         assert rel.description == "Tags"
 
 
@@ -125,7 +125,8 @@ class TestGetCustomRelationships:
         rels = get_custom_relationships(Post)
         assert len(rels) == 1
         assert rels[0].name == "tags"
-        assert rels[0].target is Tag
+        assert rels[0].target == list[Tag]
+        assert rels[0].target_entity is Tag
         assert rels[0].is_list is True
 
     def test_entity_without_relationships(self):
@@ -270,10 +271,9 @@ class TestErManagerCustomRelationships:
             __relationships__ = [
                 Relationship(
                     fk="id",
-                    target=Tag,
+                    target=list[Tag],
                     name="tags",
                     loader=tags_for_primary,
-                    is_list=True,
                 )
             ]
 
@@ -284,10 +284,9 @@ class TestErManagerCustomRelationships:
             __relationships__ = [
                 Relationship(
                     fk="id",
-                    target=Tag,
+                    target=list[Tag],
                     name="tags",
                     loader=tags_for_secondary,
-                    is_list=True,
                 )
             ]
 
@@ -324,10 +323,9 @@ class TestErManagerCustomRelationships:
             __relationships__ = [
                 Relationship(
                     fk="id",
-                    target=Tag,
+                    target=list[Tag],
                     name="tags",
                     loader=versioned_tags,
-                    is_list=True,
                 )
             ]
 
@@ -378,7 +376,6 @@ class TestCustomRelationshipResolve:
             target=FixtureUser,
             name="custom_owner",
             loader=user_loader,
-            is_list=False,
         )
         registry._registry[FixtureTask]["custom_owner"] = _build_custom_relationship_info(
             custom_rel
@@ -414,10 +411,9 @@ class TestCustomRelationshipResolve:
 
         custom_rel = Relationship(
             fk="id",
-            target=FixtureSprint,
+            target=list[FixtureSprint],
             name="greetings",
             loader=greeting_loader,
-            is_list=True,
         )
         registry._registry[FixtureSprint]["greetings"] = _build_custom_relationship_info(
             custom_rel
@@ -461,7 +457,6 @@ class TestCustomRelationshipResolve:
             target=FixtureUser,
             name="custom_owner",
             loader=user_loader,
-            is_list=False,
         )
         registry._registry[FixtureTask]["custom_owner"] = _build_custom_relationship_info(
             custom_rel

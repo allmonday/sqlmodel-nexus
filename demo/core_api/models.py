@@ -80,10 +80,9 @@ class Task(SQLModel, table=True):
     __relationships__ = [
         CustomRelationship(
             fk="id",
-            target=Tag,
+            target=list[Tag],
             name="tags",
             loader=_tags_by_task_loader,
-            is_list=True,
             description="Task tags (loaded via custom loader, not ORM)",
         )
     ]

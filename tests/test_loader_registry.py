@@ -34,10 +34,9 @@ class RegPost(SQLModel, table=True):
     __relationships__ = [
         Relationship(
             fk="id",
-            target=RegTag,
+            target=list[RegTag],
             name="tags",
             loader=_dummy_loader,
-            is_list=True,
         )
     ]
 
@@ -49,8 +48,8 @@ class ConflictPost(SQLModel, table=True):
     title: str
 
     __relationships__ = [
-        Relationship(fk="id", target=RegTag, name="tags", loader=_dummy_loader, is_list=True),
-        Relationship(fk="id", target=RegTag, name="tags", loader=_dummy_loader, is_list=True),
+        Relationship(fk="id", target=list[RegTag], name="tags", loader=_dummy_loader),
+        Relationship(fk="id", target=list[RegTag], name="tags", loader=_dummy_loader),
     ]
 
 

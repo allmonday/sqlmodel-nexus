@@ -213,8 +213,8 @@ class AmbigEntity1(SQLModel, table=True):
 
     __relationships__ = [
         Relationship(
-            fk="id", target="AmbigTarget", name="items",
-            loader=_noop_loader, is_list=True,
+            fk="id", target=list["AmbigTarget"], name="items",
+            loader=_noop_loader,
         )
     ]
 
@@ -226,8 +226,8 @@ class AmbigEntity2(SQLModel, table=True):
 
     __relationships__ = [
         Relationship(
-            fk="id", target="AmbigTarget", name="items",
-            loader=_noop_loader, is_list=True,
+            fk="id", target=list["AmbigTarget"], name="items",
+            loader=_noop_loader,
         )
     ]
 
@@ -266,8 +266,8 @@ class TestGetLoaderByNameAmbiguity:
             __tablename__ = "unique_entity_test"
             id: int | None = Field(default=None, primary_key=True)
             __relationships__ = [
-                Relationship(fk="id", target=AmbigTarget, name="unique_rel",
-                             loader=_noop_loader, is_list=True)
+                Relationship(fk="id", target=list[AmbigTarget], name="unique_rel",
+                             loader=_noop_loader)
             ]
 
         registry = ErManager(

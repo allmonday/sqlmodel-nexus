@@ -326,7 +326,7 @@ async def tags_loader(task_ids: list[int]) -> list[list[Tag]]:
 
 class Task(SQLModel, table=True):
     __relationships__ = [
-        Relationship(fk="id", target=Tag, name="tags", loader=tags_loader, is_list=True)
+        Relationship(fk="id", target=list[Tag], name="tags", loader=tags_loader)
     ]
     id: int | None = Field(default=None, primary_key=True)
     title: str

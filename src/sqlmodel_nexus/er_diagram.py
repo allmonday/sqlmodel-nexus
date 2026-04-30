@@ -140,7 +140,7 @@ class ErDiagram:
             custom_rels = get_custom_relationships(entity)
             for crel in custom_rels:
                 # Only include relationships to entities in our set
-                if crel.target not in entity_set:
+                if crel.target_entity not in entity_set:
                     continue
 
                 direction = (
@@ -151,7 +151,7 @@ class ErDiagram:
                     RelationInfo(
                         name=crel.name,
                         source=entity.__name__,
-                        target=crel.target.__name__,
+                        target=crel.target_entity.__name__,
                         fk_field=crel.fk,
                         relation_type=direction,
                     )
