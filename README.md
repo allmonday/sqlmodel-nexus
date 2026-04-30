@@ -6,6 +6,27 @@
 [![PyPI Downloads](https://static.pepy.tech/badge/sqlmodel-nexus/month)](https://pepy.tech/projects/sqlmodel-nexus)
 ![Python Versions](https://img.shields.io/pypi/pyversion/sqlmodel-nexus)
 
+## Why sqlmodel-nexus
+
+A model-driven development workflow — from LLM-assisted modeling to production API:
+
+```
+SQLModel Entities → GraphQL (validation) → FastAPI Endpoints → openapi.json → TypeScript SDK
+```
+
+**GraphQL for validation, REST for delivery.**
+
+During early development, GraphQL's flexible queries let you rapidly verify entity relationships and data shapes. When the model stabilizes, auto-generated FastAPI endpoints produce a typed REST API (OpenAPI spec), which feeds directly into TypeScript SDK generation for frontend integration.
+
+| Stage | What you get |
+|-------|-------------|
+| Model & Validate | `@query` / `@mutation` on SQLModel → auto-generated GraphQL API with DataLoader |
+| Build REST APIs | `DefineSubset` DTOs + `ErManager` → N+1-safe FastAPI endpoints |
+| Deliver to Frontend | openapi.json → TypeScript SDK |
+| AI Integration | MCP server exposing the same models to AI assistants |
+
+> **Roadmap:** Auto-generation of FastAPI endpoints from the same SQLModel definitions is in progress. Today, GraphQL auto-generation and Core API (manual DTO) modes are production-ready.
+
 ## Read This README in Order
 
 We reuse one example throughout: **Sprint → Task → User**.
