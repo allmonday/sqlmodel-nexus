@@ -43,6 +43,8 @@ bash start_all.sh
 | auth MCP | 8003 | http://localhost:8003/mcp |
 | multi-app MCP | 8004 | http://localhost:8004/mcp |
 | demo paginated | 8005 | http://localhost:8005/graphql |
+| demo RPC MCP | 8006 | http://localhost:8006/mcp |
+| demo RPC FastAPI | 8007 | http://localhost:8007/api/sprints |
 
 Press `Ctrl+C` to stop all services.
 
@@ -61,6 +63,7 @@ The concepts appear in this order on purpose:
 1. **GraphQL Mode** — the fastest path from SQLModel to a running API
 2. **Core API Mode** — DefineSubset DTOs for REST endpoints, progressing from implicit auto-loading to `resolve_*`, `post_*`, and cross-layer data flow
 3. **MCP Server** — expose the same models to AI assistants
+4. **RPC Services** — business service classes shared by MCP and web frameworks
 
 ## What sqlmodel-nexus Gives You
 
@@ -72,6 +75,7 @@ The concepts appear in this order on purpose:
 | Cross-layer data flow | `ExposeAs`, `SendTo`, `Collector` | Pass context down or aggregate values up |
 | Non-ORM relationships | `Relationship(...)` on entity | Same DataLoader infra, same auto-loading |
 | AI-ready APIs | `config_simple_mcp_server(base=...)` | Progressive-disclosure MCP tools |
+| Business services | `RpcService` subclass with `async classmethod`s | Auto-discovery, SDL introspection, MCP + FastAPI dual serving |
 
 ## Install
 
@@ -423,6 +427,110 @@ pip install sqlmodel-nexus[fastmcp]
 
 ---
 
+## RPC Services
+
+Define business logic as service classes, expose them to both MCP and web frameworks from a single source of truth.
+
+### Define Services
+
+`RpcService` subclasses declare `async classmethod`s. The metaclass auto-discovers public methods.
+
+```python
+from sqlmodel_nexus.rpc import RpcService
+
+class SprintService(RpcService):
+    """Sprint management service."""
+
+    @classmethod
+    async def list_sprints(cls) -> list[SprintSummary]:
+        """Get all sprints with task counts."""
+        stmt = build_dto_select(SprintSummary)
+        async with async_session() as session:
+            rows = (await session.exec(stmt)).all()
+        dtos = [SprintSummary(**dict(row._mapping)) for row in rows]
+        return await Resolver().resolve(dtos)
+
+    @classmethod
+    async def get_sprint(cls, sprint_id: int) -> SprintSummary | None:
+        """Get a sprint by ID."""
+        stmt = build_dto_select(SprintSummary, where=Sprint.id == sprint_id)
+        async with async_session() as session:
+            rows = (await session.exec(stmt)).all()
+        if not rows:
+            return None
+        dto = SprintSummary(**dict(rows[0]._mapping))
+        return await Resolver().resolve(dto)
+```
+
+### Expose to MCP
+
+Three-layer progressive disclosure: discover → inspect → execute.
+
+```python
+from sqlmodel_nexus.rpc import create_rpc_mcp_server, RpcServiceConfig
+
+mcp = create_rpc_mcp_server(
+    services=[
+        RpcServiceConfig(name="sprint", service=SprintService, description="Sprint ops"),
+    ],
+    name="Project RPC API",
+)
+mcp.run()  # stdio mode
+```
+
+MCP tools provided:
+
+| Tool | Purpose |
+|------|---------|
+| `list_services()` | Discover available services and method counts |
+| `describe_service(service_name)` | Method signatures (SDL format) + DTO type definitions |
+| `call_rpc(service_name, method_name, params)` | Execute a method |
+
+`describe_service` returns SDL-style signatures and type definitions:
+
+```json
+{
+  "name": "sprint",
+  "methods": [
+    {"name": "list_sprints", "signature_sdl": "list_sprints(): [SprintSummary!]!"},
+    {"name": "get_sprint", "signature_sdl": "get_sprint(sprint_id: Int!): SprintSummary"}
+  ],
+  "types": "type SprintSummary {\n  id: Int\n  name: String!\n  tasks: [TaskSummary!]!\n  ...\n}"
+}
+```
+
+### Embed in Web Frameworks
+
+The same service classes integrate directly into FastAPI or any async web framework. Routes are thin wrappers — business logic stays in the service.
+
+```python
+from fastapi import FastAPI, HTTPException
+
+app = FastAPI()
+
+@app.get("/api/sprints", tags=[SprintService.get_tag_name()])
+async def get_sprints():
+    return await SprintService.list_sprints()
+
+@app.get("/api/sprints/{sprint_id}", tags=[SprintService.get_tag_name()])
+async def get_sprint(sprint_id: int):
+    result = await SprintService.get_sprint(sprint_id=sprint_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Sprint not found")
+    return result
+```
+
+`get_tag_name()` returns an OpenAPI-compatible tag name (e.g. `SprintService` → `"sprint"`), so `/docs` groups routes by service automatically.
+
+**One service class, two serving modes:**
+
+```
+RpcService subclass ──┬── MCP server (AI agents, progressive disclosure)
+                      └── FastAPI routes (REST API, OpenAPI docs)
+```
+
+---
+
 ## Demo
 
 
@@ -437,6 +545,14 @@ uv run uvicorn demo.core_api.app:app --reload
 
 # MCP server
 uv run --with fastmcp python -m demo.mcp_server
+
+# RPC MCP server (stdio or HTTP)
+uv run --with fastmcp python -m demo.rpc_mcp_server          # stdio
+uv run --with fastmcp python -m demo.rpc_mcp_server --http   # HTTP on port 8006
+
+# RPC FastAPI — same services served as REST endpoints
+uv run uvicorn demo.rpc_fastapi:app --port 8007
+# visit /docs to see routes grouped by service tag
 ```
 
 ## License
