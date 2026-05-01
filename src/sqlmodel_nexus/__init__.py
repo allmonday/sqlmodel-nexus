@@ -64,6 +64,7 @@ from sqlmodel_nexus.loader import ErManager
 from sqlmodel_nexus.query_parser import FieldSelection, QueryParser
 from sqlmodel_nexus.relationship import Relationship
 from sqlmodel_nexus.resolver import Loader
+from sqlmodel_nexus.rpc import RpcService, RpcServiceConfig, create_rpc_mcp_server
 from sqlmodel_nexus.sdl_generator import SDLGenerator
 from sqlmodel_nexus.standard_queries import AutoQueryConfig, add_standard_queries
 from sqlmodel_nexus.subset import DefineSubset, SubsetConfig, build_dto_select
@@ -96,4 +97,8 @@ __all__ = [
     "ErDiagram",
     # Query builder
     "build_dto_select",
+    # RPC MCP mode
+    "RpcService",
+    "RpcServiceConfig",
+    "create_rpc_mcp_server",
 ]

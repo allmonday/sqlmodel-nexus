@@ -22,10 +22,25 @@ PORT_AUTH_GQL=8002
 PORT_AUTH_MCP=8003
 PORT_MULTI_MCP=8004
 PORT_PAG=8005
+PORT_RPC_MCP=8006
 
-ALL_PORTS=($PORT_DEMO $PORT_CORE_API $PORT_AUTH_GQL $PORT_AUTH_MCP $PORT_MULTI_MCP $PORT_PAG)
+ALL_PORTS=($PORT_DEMO $PORT_CORE_API $PORT_AUTH_GQL $PORT_AUTH_MCP $PORT_MULTI_MCP $PORT_PAG $PORT_RPC_MCP)
 
 PIDS=()
+
+clear_existing_ports() {
+    echo -e "${YELLOW}Checking existing listeners on demo ports...${NC}"
+    for port in "${ALL_PORTS[@]}"; do
+        local existing
+        existing=$(lsof -ti:"$port" 2>/dev/null || true)
+        if [ -n "$existing" ]; then
+            echo -e "  ${YELLOW}Port $port in use, stopping old process(es):${NC} $existing"
+            kill $existing 2>/dev/null || true
+            sleep 0.3
+            lsof -ti:"$port" 2>/dev/null | xargs kill -9 2>/dev/null || true
+        fi
+    done
+}
 
 cleanup() {
     echo ""
@@ -72,6 +87,9 @@ echo -e "${CYAN}sqlmodel-nexus Demo Services${NC}"
 echo "=============================================="
 echo ""
 
+clear_existing_ports
+echo ""
+
 # Start services
 echo -e "${BLUE}Starting${NC} demo GraphQL on port $PORT_DEMO"
 uv run uvicorn demo.app:app --port $PORT_DEMO &
@@ -97,6 +115,10 @@ echo -e "${BLUE}Starting${NC} demo GraphQL (paginated) on port $PORT_PAG"
 uv run uvicorn demo.app_paginated:app --port $PORT_PAG &
 PIDS+=($!)
 
+echo -e "${BLUE}Starting${NC} demo RPC MCP on port $PORT_RPC_MCP"
+PORT=$PORT_RPC_MCP uv run --with fastmcp python -m demo.rpc_mcp_server --http &
+PIDS+=($!)
+
 echo ""
 
 # Wait for all services to be ready
@@ -107,6 +129,7 @@ wait_for_port $PORT_AUTH_GQL "auth GraphQL" || true
 wait_for_port $PORT_AUTH_MCP "auth MCP"     || true
 wait_for_port $PORT_MULTI_MCP "multi-app MCP" || true
 wait_for_port $PORT_PAG "demo paginated"     || true
+wait_for_port $PORT_RPC_MCP "demo RPC MCP"   || true
 
 echo ""
 
@@ -122,6 +145,7 @@ printf "  %-20s %-8s %s\n" "auth GraphQL" "$PORT_AUTH_GQL" "http://localhost:$PO
 printf "  %-20s %-8s %s\n" "auth MCP" "$PORT_AUTH_MCP" "http://localhost:$PORT_AUTH_MCP/mcp"
 printf "  %-20s %-8s %s\n" "multi-app MCP" "$PORT_MULTI_MCP" "http://localhost:$PORT_MULTI_MCP/mcp"
 printf "  %-20s %-8s %s\n" "demo paginated" "$PORT_PAG" "http://localhost:$PORT_PAG/graphql"
+printf "  %-20s %-8s %s\n" "demo RPC MCP" "$PORT_RPC_MCP" "http://localhost:$PORT_RPC_MCP/mcp"
 echo "=============================================="
 echo ""
 echo -e "${YELLOW}Press Ctrl+C to stop all services${NC}"
