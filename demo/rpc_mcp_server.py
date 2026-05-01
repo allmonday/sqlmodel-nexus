@@ -134,10 +134,9 @@ class SprintService(RpcService):
 
 
 def main() -> None:
+    import asyncio
     import os
     import sys
-
-    import asyncio
 
     asyncio.run(init_db())
 
@@ -164,8 +163,8 @@ def main() -> None:
     )
 
     if "--http" in sys.argv:
-        from starlette.middleware.cors import CORSMiddleware
         import uvicorn
+        from starlette.middleware.cors import CORSMiddleware
 
         # Use stateless HTTP so one-shot clients (e.g. list-tools probes)
         # can call MCP endpoints without managing mcp-session-id.
