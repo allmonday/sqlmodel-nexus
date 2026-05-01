@@ -23,8 +23,9 @@ PORT_AUTH_MCP=8003
 PORT_MULTI_MCP=8004
 PORT_PAG=8005
 PORT_RPC_MCP=8006
+PORT_RPC_FASTAPI=8007
 
-ALL_PORTS=($PORT_DEMO $PORT_CORE_API $PORT_AUTH_GQL $PORT_AUTH_MCP $PORT_MULTI_MCP $PORT_PAG $PORT_RPC_MCP)
+ALL_PORTS=($PORT_DEMO $PORT_CORE_API $PORT_AUTH_GQL $PORT_AUTH_MCP $PORT_MULTI_MCP $PORT_PAG $PORT_RPC_MCP $PORT_RPC_FASTAPI)
 
 PIDS=()
 
@@ -119,6 +120,10 @@ echo -e "${BLUE}Starting${NC} demo RPC MCP on port $PORT_RPC_MCP"
 PORT=$PORT_RPC_MCP uv run --with fastmcp python -m demo.rpc_mcp_server --http &
 PIDS+=($!)
 
+echo -e "${BLUE}Starting${NC} demo RPC FastAPI on port $PORT_RPC_FASTAPI"
+uv run uvicorn demo.rpc_fastapi:app --port $PORT_RPC_FASTAPI &
+PIDS+=($!)
+
 echo ""
 
 # Wait for all services to be ready
@@ -130,6 +135,7 @@ wait_for_port $PORT_AUTH_MCP "auth MCP"     || true
 wait_for_port $PORT_MULTI_MCP "multi-app MCP" || true
 wait_for_port $PORT_PAG "demo paginated"     || true
 wait_for_port $PORT_RPC_MCP "demo RPC MCP"   || true
+wait_for_port $PORT_RPC_FASTAPI "demo RPC FastAPI" || true
 
 echo ""
 
@@ -146,6 +152,7 @@ printf "  %-20s %-8s %s\n" "auth MCP" "$PORT_AUTH_MCP" "http://localhost:$PORT_A
 printf "  %-20s %-8s %s\n" "multi-app MCP" "$PORT_MULTI_MCP" "http://localhost:$PORT_MULTI_MCP/mcp"
 printf "  %-20s %-8s %s\n" "demo paginated" "$PORT_PAG" "http://localhost:$PORT_PAG/graphql"
 printf "  %-20s %-8s %s\n" "demo RPC MCP" "$PORT_RPC_MCP" "http://localhost:$PORT_RPC_MCP/mcp"
+printf "  %-20s %-8s %s\n" "demo RPC FastAPI" "$PORT_RPC_FASTAPI" "http://localhost:$PORT_RPC_FASTAPI/api/sprints"
 echo "=============================================="
 echo ""
 echo -e "${YELLOW}Press Ctrl+C to stop all services${NC}"
