@@ -1,5 +1,55 @@
 # Changelog
 
+## 1.2.0
+
+### New Feature: RPC Services
+
+Business service classes with auto-discovery, SDL introspection, and dual serving via MCP and web frameworks.
+
+**New package `sqlmodel_nexus.rpc`:**
+
+| Export | Purpose |
+|--------|---------|
+| `RpcService` | Base class — subclasses declare `async classmethod`s, auto-discovered by `BusinessMeta` metaclass |
+| `create_rpc_mcp_server` | Create an independent FastMCP server exposing services as progressive-disclosure tools |
+| `RpcServiceConfig` | Service registration config (name, service class, description) |
+
+**RpcService features:**
+- `BusinessMeta` metaclass scans for public `async classmethod`s, excludes `_`-prefixed and `get_tag_name`
+- `get_tag_name()` returns OpenAPI-compatible tag name (`SprintService` → `"sprint"`)
+- `ServiceIntrospector` generates SDL-style method signatures and DTO type definitions
+- FK fields from `DefineSubset` DTOs are hidden from SDL output
+- `_type_to_sdl_name()` converts Python type annotations to SDL types (`list[int]` → `[Int!]!`, `X | None` → `X`)
+
+**MCP server — three-layer progressive disclosure:**
+
+| Tool | Purpose |
+|------|---------|
+| `list_services()` | Discover available services and method counts |
+| `describe_service(service_name)` | Method signatures (SDL) + DTO type definitions |
+| `call_rpc(service_name, method_name, params)` | Execute a method with JSON params |
+
+**Web framework integration:**
+- Same `RpcService` classes serve both MCP and FastAPI routes
+- Routes are thin wrappers calling service classmethods
+- OpenAPI tags derived from `get_tag_name()` for automatic grouping in `/docs`
+
+### Demos
+
+- **`demo/rpc_mcp_server.py`** — RPC MCP server with UserService, TaskService, SprintService (stdio + HTTP)
+- **`demo/rpc_fastapi.py`** — FastAPI routes calling the same RPC services, demonstrating dual-serving pattern
+- Update `start_all.sh` with RPC MCP (port 8006) and RPC FastAPI (port 8007)
+
+### Tests
+
+- Add `tests/test_rpc.py` — 41 tests covering `BusinessMeta` discovery, SDL type conversion, `ServiceIntrospector`, MCP tool integration
+
+### Documentation
+
+- Add "RPC Services" section to README with service definition, MCP exposure, and web framework embedding examples
+- Update README quick start table and reading order
+
+
 ## 1.1.1
 
 ### New Features
