@@ -5,6 +5,8 @@ into SchemaNode/Link graph data for the DiagramRenderer.
 """
 from __future__ import annotations
 
+import typing
+
 from sqlmodel_nexus.loader.registry import ErManager, RelationshipInfo
 from sqlmodel_nexus.voyager.render import DiagramRenderer
 from sqlmodel_nexus.voyager.type import (
@@ -12,6 +14,7 @@ from sqlmodel_nexus.voyager.type import (
     FieldInfo,
     FieldType,
     Link,
+    MethodInfo,
     SchemaNode,
 )
 from sqlmodel_nexus.voyager.type_helper import (
@@ -21,6 +24,43 @@ from sqlmodel_nexus.voyager.type_helper import (
 )
 
 ARROW = "=>"
+
+
+def _get_return_type_name(func) -> str:
+    """Extract return type annotation as a readable string."""
+    try:
+        hints = typing.get_type_hints(func)
+        ret = hints.get('return')
+        if ret is not None:
+            return get_type_name(ret)
+    except Exception:
+        pass
+    return 'Unknown'
+
+
+def _discover_methods(entity_kls: type) -> tuple[list[MethodInfo], list[MethodInfo]]:
+    """Scan entity for @query/@mutation methods, return (queries, mutations)."""
+    queries: list[MethodInfo] = []
+    mutations: list[MethodInfo] = []
+    for attr_name in dir(entity_kls):
+        try:
+            attr = getattr(entity_kls, attr_name)
+        except Exception:
+            continue
+        if not callable(attr):
+            continue
+        func = getattr(attr, '__func__', attr)
+        if getattr(attr, '_graphql_query', False):
+            queries.append(MethodInfo(
+                name=func.__name__,
+                return_type=_get_return_type_name(func),
+            ))
+        elif getattr(attr, '_graphql_mutation', False):
+            mutations.append(MethodInfo(
+                name=func.__name__,
+                return_type=_get_return_type_name(func),
+            ))
+    return queries, mutations
 
 
 def _is_list_relationship(rel: RelationshipInfo) -> bool:
@@ -91,12 +131,15 @@ class ErDiagramDotBuilder:
         if full_name not in self.node_set:
             # Extract fields from model_fields
             fields = self._get_entity_fields(entity_kls)
+            queries, mutations = _discover_methods(entity_kls)
 
             self.node_set[full_name] = SchemaNode(
                 id=full_name,
                 module=entity_kls.__module__,
                 name=entity_kls.__name__,
                 fields=fields,
+                queries=queries,
+                mutations=mutations,
             )
         return full_name
 

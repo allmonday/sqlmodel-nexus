@@ -18,9 +18,10 @@ Also includes a custom non-ORM relationship: Task -> Tag via __relationships__.
 
 from typing import Optional
 
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, Relationship, SQLModel, select
 
 from sqlmodel_nexus import Relationship as CustomRelationship
+from sqlmodel_nexus import mutation, query
 
 
 class User(SQLModel, table=True):
@@ -30,6 +31,27 @@ class User(SQLModel, table=True):
     name: str
 
     comments: list["Comment"] = Relationship(back_populates="author")
+
+    @query
+    async def get_users(cls, limit: int = 10) -> list["User"]:
+        """Get all users with optional limit."""
+        from demo.core_api.database import async_session
+
+        async with async_session() as session:
+            result = await session.exec(select(cls).limit(limit))
+            return list(result.all())
+
+    @mutation
+    async def create_user(cls, name: str) -> "User":
+        """Create a new user."""
+        from demo.core_api.database import async_session
+
+        async with async_session() as session:
+            user = cls(name=name)
+            session.add(user)
+            await session.commit()
+            await session.refresh(user)
+            return user
 
 
 class Project(SQLModel, table=True):
@@ -55,6 +77,15 @@ class Sprint(SQLModel, table=True):
         back_populates="sprint",
         sa_relationship_kwargs={"order_by": "Task.id"},
     )
+
+    @query
+    async def get_sprints(cls, limit: int = 10) -> list["Sprint"]:
+        """Get all sprints with optional limit."""
+        from demo.core_api.database import async_session
+
+        async with async_session() as session:
+            result = await session.exec(select(cls).limit(limit))
+            return list(result.all())
 
 
 class Tag(SQLModel, table=True):
@@ -131,6 +162,27 @@ class Task(SQLModel, table=True):
             description="Task tags (loaded via custom loader, not ORM)",
         )
     ]
+
+    @query
+    async def get_tasks(cls, limit: int = 10) -> list["Task"]:
+        """Get all tasks with optional limit."""
+        from demo.core_api.database import async_session
+
+        async with async_session() as session:
+            result = await session.exec(select(cls).limit(limit))
+            return list(result.all())
+
+    @mutation
+    async def create_task(cls, title: str, sprint_id: int, owner_id: int | None = None) -> "Task":
+        """Create a new task."""
+        from demo.core_api.database import async_session
+
+        async with async_session() as session:
+            task = cls(title=title, sprint_id=sprint_id, owner_id=owner_id)
+            session.add(task)
+            await session.commit()
+            await session.refresh(task)
+            return task
 
 
 class Label(SQLModel, table=True):
