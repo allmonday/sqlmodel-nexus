@@ -1,6 +1,15 @@
 # SQLModel Nexus
 
-> From SQLModel to running GraphQL API, Core API DTOs, and MCP Server — with zero boilerplate.
+Progressive SQLModel extension with visual ER diagrams.
+
+Start from ORM entities, extend with non-ORM relationships, and generate GraphQL for interaction. Use `DefineSubset` to declaratively construct response DTOs — field selection, relationship loading, and derived fields all driven by declarations, not imperative code. Visualize your entity graph and data flow through interactive ER diagrams.
+
+```mermaid
+flowchart LR
+    p1["**P1: ER Diagram**<br/>SQLModel entities + non-ORM relationships<br/>+ visual ER diagram<br/><hr>_Focus: Business Modeling_"]
+    --> p2["**P2: GraphQL API**<br/>@query / @mutation<br/>SDL auto-generation + DataLoader batching<br/><hr>_Focus: Business Queries_"]
+    --> p3["**P3: Declarative Assembly**<br/>DefineSubset DTOs + implicit auto-loading<br/>resolve_* / post_*<br/><hr>_Focus: Use Case Construction_"]
+```
 
 [![pypi](https://img.shields.io/pypi/v/sqlmodel-nexus.svg)](https://pypi.python.org/pypi/sqlmodel-nexus)
 [![PyPI Downloads](https://static.pepy.tech/badge/sqlmodel-nexus/month)](https://pepy.tech/projects/sqlmodel-nexus)
