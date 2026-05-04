@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.3.1
+
+### Refactoring: Constant Extraction
+
+Replace magic strings with named constants across the codebase.
+
+| Constant | Used in |
+|----------|---------|
+| `QUERY_META_PARAM` | `introspection`, `sdl_generator` |
+| `RELATIONSHIPS_ATTR` | `relationship` |
+| `RESOLVE_PREFIX` / `POST_PREFIX` | `resolver`, `subset` |
+| `RPC_METHODS_ATTR` | `rpc/business`, `rpc/introspector`, `rpc/server` |
+
+### Demo Restructure
+
+Consolidate all demo applications under `demo/` with domain-based sub-packages:
+
+| Before | After |
+|--------|-------|
+| `auth_demo/` | `demo/auth/` |
+| `demo/app.py` | `demo/blog/app.py` |
+| `demo_multiple_app/` | `demo/multi_app/` |
+| `demo/rpc_*.py` | `demo/rpc/` |
+
+- Add `@query` / `@mutation` methods for User and Task entities in `demo/blog/models.py`
+- Update all import paths to match new structure
+
+### Voyager Enhancements
+
+- **ER Diagram method discovery**: `@query` / `@mutation` methods are now shown on entity SchemaNodes
+- **DefineSubset source tracking**: Voyager generates subset → source entity links for DTOs
+- **RPC method source resolution**: `get_source_code` / `get_vscode_link` support `service.method` format in addition to `module.ClassName`
+
+### Documentation
+
+- Rewrite README tagline to emphasize progressive framework positioning and `DefineSubset` declarative capabilities
+- Add mermaid flowchart illustrating P1 (ER Diagram) → P2 (GraphQL API) → P3 (Declarative Assembly) progression
+
 ## 1.3.0
 
 ### New Feature: Voyager Visualization
