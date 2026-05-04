@@ -14,6 +14,8 @@ from sqlmodel import SQLModel
 from sqlmodel_nexus.type_converter import TypeConverter
 from sqlmodel_nexus.utils.schema_helpers import get_core_types, is_input_type
 
+QUERY_META_PARAM = "query_meta"
+
 if TYPE_CHECKING:
     pass
 
@@ -368,7 +370,7 @@ class IntrospectionGenerator:
         sig = inspect.signature(func)
 
         for param_name, param in sig.parameters.items():
-            if param_name in ("cls", "self", "query_meta", "return"):
+            if param_name in ("cls", "self", QUERY_META_PARAM, "return"):
                 continue
 
             type_hint = hints.get(param_name)
@@ -589,7 +591,7 @@ class IntrospectionGenerator:
                     hints = {}
 
                 for param_name, _param in sig.parameters.items():
-                    if param_name in ("cls", "self", "query_meta", "return"):
+                    if param_name in ("cls", "self", QUERY_META_PARAM, "return"):
                         continue
                     if param_name in hints:
                         collect_from_type(hints[param_name])

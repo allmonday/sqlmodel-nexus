@@ -36,6 +36,8 @@ from pydantic import BaseModel, create_model, model_validator
 from pydantic.fields import FieldInfo
 from sqlmodel import SQLModel
 
+from sqlmodel_nexus.resolver import POST_PREFIX, RESOLVE_PREFIX  # noqa: F401
+
 # ──────────────────────────────────────────────────────────
 # Constants
 # ──────────────────────────────────────────────────────────
@@ -217,7 +219,7 @@ def _extract_methods(namespace: dict[str, Any]) -> dict[str, Any]:
     methods = {}
     for key, value in namespace.items():
         if callable(value) and (
-            key.startswith("resolve_") or key.startswith("post_")
+            key.startswith(RESOLVE_PREFIX) or key.startswith(POST_PREFIX)
         ):
             methods[key] = value
     return methods

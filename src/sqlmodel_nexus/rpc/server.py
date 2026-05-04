@@ -19,6 +19,7 @@ from sqlmodel_nexus.mcp.types.errors import (
     create_error_response,
     create_success_response,
 )
+from sqlmodel_nexus.rpc.business import RPC_METHODS_ATTR  # noqa: F401
 from sqlmodel_nexus.rpc.introspector import ServiceIntrospector
 
 if TYPE_CHECKING:
@@ -199,8 +200,9 @@ def create_rpc_mcp_server(
             )
 
         # Look up method
-        if method_name not in service_cls.__rpc_methods__:
-            available = list(service_cls.__rpc_methods__.keys())
+        methods = getattr(service_cls, RPC_METHODS_ATTR)
+        if method_name not in methods:
+            available = list(methods.keys())
             return create_error_response(
                 f"Method '{method_name}' not found in service '{service_name}'. "
                 f"Available methods: {available}",

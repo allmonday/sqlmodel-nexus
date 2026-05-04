@@ -147,21 +147,25 @@ def _analyze_method_params(
     return info
 
 
+RESOLVE_PREFIX = "resolve_"
+POST_PREFIX = "post_"
+
+
 def _build_class_meta(kls: type) -> _ClassMeta:
     """Build metadata for a class by scanning its methods once."""
     meta = _ClassMeta()
 
     for attr_name in dir(kls):
-        if attr_name.startswith("resolve_"):
-            field_name = attr_name[len("resolve_"):]
+        if attr_name.startswith(RESOLVE_PREFIX):
+            field_name = attr_name[len(RESOLVE_PREFIX):]
             # Verify it's actually callable (not just an attribute)
             attr = getattr(kls, attr_name, None)
             if attr is not None and callable(attr):
                 meta.resolve_methods.append((field_name, attr_name))
                 meta.resolve_params[attr_name] = _analyze_method_params(attr)
 
-        elif attr_name.startswith("post_"):
-            field_name = attr_name[len("post_"):]
+        elif attr_name.startswith(POST_PREFIX):
+            field_name = attr_name[len(POST_PREFIX):]
             attr = getattr(kls, attr_name, None)
             if attr is not None and callable(attr):
                 meta.post_methods.append((field_name, attr_name))

@@ -212,20 +212,41 @@ class VoyagerContext:
         </html>
         """
 
+    def _resolve_object(self, schema_name: str):
+        """Resolve a schema_name to a Python object.
+
+        Handles two formats:
+          - Route ID: "service_name.method_name" (looked up from RPC configs)
+          - Full class name: "module.path.ClassName" (imported directly)
+        """
+        # Try RPC route ID first: "service_name.method_name"
+        service_map = {cfg["name"]: cfg["service"] for cfg in self.configs}
+        dot_idx = schema_name.find(".")
+        if dot_idx > 0:
+            svc_name = schema_name[:dot_idx]
+            method_name = schema_name[dot_idx + 1:]
+            if svc_name in service_map:
+                svc_cls = service_map[svc_name]
+                method = getattr(svc_cls, method_name, None)
+                if method is not None:
+                    return method
+
+        # Fall back to module.ClassName import
+        components = schema_name.split(".")
+        if len(components) < 2:
+            return None
+        module_name = ".".join(components[:-1])
+        class_name = components[-1]
+        mod = __import__(module_name, fromlist=[class_name])
+        return getattr(mod, class_name)
+
     def get_source_code(self, schema_name: str) -> dict:
-        """Get source code for a schema."""
+        """Get source code for a schema or RPC method."""
         try:
-            components = schema_name.split(".")
-            if len(components) < 2:
-                return {"error": "Invalid schema name format. Expected format: module.ClassName"}
-
-            module_name = ".".join(components[:-1])
-            class_name = components[-1]
-
-            mod = __import__(module_name, fromlist=[class_name])
-            obj = getattr(mod, class_name)
+            obj = self._resolve_object(schema_name)
+            if obj is None:
+                return {"error": "Invalid schema name format."}
             source_code = get_source(obj)
-
             return {"source_code": source_code}
         except ImportError as e:
             return {"error": f"Module not found: {e}"}
@@ -235,19 +256,12 @@ class VoyagerContext:
             return {"error": f"Internal error: {str(e)}"}
 
     def get_vscode_link(self, schema_name: str) -> dict:
-        """Get VSCode link for a schema."""
+        """Get VSCode link for a schema or RPC method."""
         try:
-            components = schema_name.split(".")
-            if len(components) < 2:
-                return {"error": "Invalid schema name format. Expected format: module.ClassName"}
-
-            module_name = ".".join(components[:-1])
-            class_name = components[-1]
-
-            mod = __import__(module_name, fromlist=[class_name])
-            obj = getattr(mod, class_name)
+            obj = self._resolve_object(schema_name)
+            if obj is None:
+                return {"error": "Invalid schema name format."}
             link = get_vscode_link(obj, online_repo_url=self.online_repo_url)
-
             return {"link": link}
         except ImportError as e:
             return {"error": f"Module not found: {e}"}

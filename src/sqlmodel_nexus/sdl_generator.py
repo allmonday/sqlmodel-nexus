@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, get_args, get_origin, get_type_hints
 
 from sqlmodel import SQLModel
 
+from sqlmodel_nexus.introspection import QUERY_META_PARAM  # noqa: F401
 from sqlmodel_nexus.type_converter import TypeConverter
 from sqlmodel_nexus.utils.naming import to_graphql_field_name
 from sqlmodel_nexus.utils.schema_helpers import get_core_types, is_input_type
@@ -236,7 +237,7 @@ class SDLGenerator:
                             hints = {}
 
                         for param_name, _param in sig.parameters.items():
-                            if param_name in ("cls", "self", "query_meta"):
+                            if param_name in ("cls", "self", QUERY_META_PARAM):
                                 continue
                             if param_name in hints:
                                 collect_from_type(hints[param_name])
@@ -518,7 +519,7 @@ class SDLGenerator:
         params: list[str] = []
 
         for param_name, _param in sig.parameters.items():
-            if param_name in ("cls", "self", "query_meta"):
+            if param_name in ("cls", "self", QUERY_META_PARAM):
                 continue
 
             if param_name == "filter":
@@ -678,7 +679,7 @@ class SDLGenerator:
         if operation_type == "Mutation":
             sig = inspect.signature(func)
             for param_name in sig.parameters:
-                if param_name in ("cls", "self", "query_meta"):
+                if param_name in ("cls", "self", QUERY_META_PARAM):
                     continue
                 if param_name in hints:
                     related_entities.update(self._collect_related_entities(hints[param_name]))

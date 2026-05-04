@@ -12,7 +12,10 @@ from typing import Any, get_args, get_origin
 
 from pydantic import BaseModel
 
-from sqlmodel_nexus.rpc.business import RpcService
+from sqlmodel_nexus.rpc.business import (
+    RPC_METHODS_ATTR,  # noqa: F401
+    RpcService,
+)
 from sqlmodel_nexus.subset import get_subset_source
 
 # ──────────────────────────────────────────────────
@@ -388,7 +391,7 @@ class ServiceIntrospector:
                     "name": name,
                     "description": self._descriptions.get(name)
                     or service_cls.__doc__,
-                    "methods_count": len(service_cls.__rpc_methods__),
+                    "methods_count": len(getattr(service_cls, RPC_METHODS_ATTR)),
                 }
             )
         return result
@@ -412,7 +415,7 @@ class ServiceIntrospector:
         all_dto_types: list[type[BaseModel]] = []
         visited: set[str] = set()
 
-        for method_name in service_cls.__rpc_methods__:
+        for method_name in getattr(service_cls, RPC_METHODS_ATTR):
             method_info = self._extract_method_info(service_cls, method_name)
             methods.append(method_info)
 

@@ -8,8 +8,10 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
+from sqlmodel_nexus.rpc.business import RPC_METHODS_ATTR  # noqa: F401
 from sqlmodel_nexus.rpc.introspector import ServiceIntrospector
 from sqlmodel_nexus.rpc.types import RpcServiceConfig
+from sqlmodel_nexus.subset import SUBSET_REFERENCE  # noqa: F401
 from sqlmodel_nexus.voyager.filter import filter_graph
 from sqlmodel_nexus.voyager.render import Renderer
 from sqlmodel_nexus.voyager.type import (
@@ -89,7 +91,7 @@ class RpcVoyager:
             self.tags.append(tag_obj)
             self.tag_set[tag_id] = tag_obj
 
-            for method_name in service_cls.__rpc_methods__:
+            for method_name in getattr(service_cls, RPC_METHODS_ATTR):
                 route_id = f'{service_name}.{method_name}'
 
                 if self.route_name is not None and route_id != self.route_name:
@@ -204,6 +206,19 @@ class RpcVoyager:
                     type='parent',
                 )
                 self._analysis_schemas(base_class)
+
+        # Handle DefineSubset source entity
+        subset_source = getattr(schema, SUBSET_REFERENCE, None)
+        if subset_source is not None:
+            self._add_to_node_set(subset_source)
+            self._add_to_link_set(
+                source=self._generate_node_head(full_class_name(schema)),
+                source_origin=full_class_name(schema),
+                target=self._generate_node_head(full_class_name(subset_source)),
+                target_origin=full_class_name(subset_source),
+                type='subset',
+            )
+            self._analysis_schemas(subset_source)
 
         # Handle fields
         for k, v in schema.model_fields.items():

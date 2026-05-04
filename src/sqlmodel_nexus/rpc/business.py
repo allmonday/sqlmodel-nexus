@@ -10,6 +10,8 @@ import asyncio
 import re
 from typing import Any
 
+RPC_METHODS_ATTR = "__rpc_methods__"
+
 
 def _to_snake_case(name: str) -> str:
     """Convert CamelCase to snake_case."""
@@ -31,7 +33,7 @@ class BusinessMeta(type):
         if name == "RpcService" and not any(
             isinstance(b, BusinessMeta) for b in bases
         ):
-            cls.__rpc_methods__ = {}
+            setattr(cls, RPC_METHODS_ATTR, {})
             return cls
 
         # Collect async classmethods from this class and bases
@@ -39,8 +41,8 @@ class BusinessMeta(type):
 
         # First collect from bases
         for base in bases:
-            if hasattr(base, "__rpc_methods__"):
-                methods.update(base.__rpc_methods__)
+            if hasattr(base, RPC_METHODS_ATTR):
+                methods.update(getattr(base, RPC_METHODS_ATTR))
 
         # Then collect from current class
         _EXCLUDED_METHODS = {"get_tag_name"}
@@ -54,7 +56,7 @@ class BusinessMeta(type):
             if func is not None and asyncio.iscoroutinefunction(func):
                 methods[attr_name] = attr_value
 
-        cls.__rpc_methods__ = methods
+        setattr(cls, RPC_METHODS_ATTR, methods)
         return cls
 
 

@@ -31,6 +31,8 @@ from typing import Any, get_args, get_origin
 
 from sqlmodel import SQLModel
 
+RELATIONSHIPS_ATTR = "__relationships__"
+
 
 @dataclass
 class Relationship:
@@ -79,7 +81,7 @@ def get_custom_relationships(entity: type[SQLModel]) -> list[Relationship]:
     Returns an empty list if __relationships__ is not defined.
     Validates each entry is a Relationship instance.
     """
-    raw = getattr(entity, "__relationships__", None)
+    raw = getattr(entity, RELATIONSHIPS_ATTR, None)
     if raw is None:
         return []
     if not isinstance(raw, list):
