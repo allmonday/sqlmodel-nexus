@@ -22,9 +22,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from pydantic import BaseModel
 
-from auth_demo.auth import require_admin
-from auth_demo.database import async_session, init_db
-from auth_demo.models import BaseEntity
+from demo.auth.auth import require_admin
+from demo.blog.database import async_session, init_db
+from demo.blog.models import BaseEntity
 from sqlmodel_nexus import GraphQLHandler
 
 

@@ -13,8 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from pydantic import BaseModel
 
-from demo.database import async_session, init_db
-from demo.models import BaseEntity
+from demo.blog.database import async_session, init_db
+from demo.blog.models import BaseEntity
 from sqlmodel_nexus import AutoQueryConfig, GraphQLHandler
 
 

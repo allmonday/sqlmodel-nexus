@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from demo.database import async_session
+from demo.blog.database import async_session
 
 # Import demo models
-from demo.models import BaseEntity, Comment, Post, User
+from demo.blog.models import BaseEntity, Comment, Post, User
 from sqlmodel_nexus import AutoQueryConfig, GraphQLHandler, add_standard_queries
 
 

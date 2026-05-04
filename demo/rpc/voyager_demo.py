@@ -27,7 +27,7 @@ from demo.core_api.models import (
     TaskLabel,
     User,
 )
-from demo.rpc_mcp_server import SprintService, TaskService, UserService
+from demo.rpc.mcp_server import SprintService, TaskService, UserService
 from sqlmodel_nexus import ErManager
 from sqlmodel_nexus.rpc.types import RpcServiceConfig
 from sqlmodel_nexus.voyager import create_rpc_voyager

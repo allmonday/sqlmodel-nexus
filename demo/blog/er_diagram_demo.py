@@ -11,7 +11,7 @@ For the Core API models (Sprint/Task/User), see:
     then GET /api/er-diagram
 """
 
-from demo.models import Comment, Post, User
+from demo.blog.models import Comment, Post, User
 from sqlmodel_nexus import ErDiagram
 
 

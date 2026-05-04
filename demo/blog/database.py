@@ -20,7 +20,7 @@ async def init_db() -> None:
     """Initialize database tables and seed data."""
     from sqlmodel import SQLModel
 
-    from demo.models import Comment, Post, User, UserFavoritePost
+    from demo.blog.models import Comment, Post, User, UserFavoritePost
 
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)

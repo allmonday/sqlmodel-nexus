@@ -25,7 +25,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from demo.core_api.database import init_db
-from demo.rpc_mcp_server import SprintService, TaskService, UserService
+from demo.rpc.mcp_server import SprintService, TaskService, UserService
 
 
 @asynccontextmanager

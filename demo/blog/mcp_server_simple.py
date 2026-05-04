@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlmodel import SQLModel
 
-from demo.database import async_session
+from demo.blog.database import async_session
 from sqlmodel_nexus import mutation, query
 from sqlmodel_nexus.mcp import config_simple_mcp_server
 
@@ -64,7 +64,7 @@ async def init_db():
     """Initialize the database with sample data."""
     async with async_session() as session:
         # Create tables
-        from demo.database import engine
+        from demo.blog.database import engine
 
         async with engine.begin() as conn:
             await conn.run_sync(BaseEntity.metadata.create_all)

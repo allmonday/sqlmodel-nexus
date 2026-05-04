@@ -94,7 +94,7 @@ echo ""
 
 # Start services
 echo -e "${BLUE}Starting${NC} demo GraphQL on port $PORT_DEMO"
-uv run uvicorn demo.app:app --port $PORT_DEMO &
+uv run uvicorn demo.blog.app:app --port $PORT_DEMO &
 PIDS+=($!)
 
 echo -e "${BLUE}Starting${NC} demo CoreAPI on port $PORT_CORE_API"
@@ -102,31 +102,31 @@ uv run uvicorn demo.core_api.app:app --port $PORT_CORE_API &
 PIDS+=($!)
 
 echo -e "${BLUE}Starting${NC} auth GraphQL on port $PORT_AUTH_GQL"
-uv run uvicorn auth_demo.app:app --port $PORT_AUTH_GQL &
+uv run uvicorn demo.auth.app:app --port $PORT_AUTH_GQL &
 PIDS+=($!)
 
 echo -e "${BLUE}Starting${NC} auth MCP on port $PORT_AUTH_MCP"
-PORT=$PORT_AUTH_MCP uv run python -m auth_demo.mcp_server &
+PORT=$PORT_AUTH_MCP uv run python -m demo.auth.mcp_server &
 PIDS+=($!)
 
 echo -e "${BLUE}Starting${NC} multi-app MCP on port $PORT_MULTI_MCP"
-PORT=$PORT_MULTI_MCP uv run python -m demo_multiple_app.mcp_server &
+PORT=$PORT_MULTI_MCP uv run python -m demo.multi_app.mcp_server &
 PIDS+=($!)
 
 echo -e "${BLUE}Starting${NC} demo GraphQL (paginated) on port $PORT_PAG"
-uv run uvicorn demo.app_paginated:app --port $PORT_PAG &
+uv run uvicorn demo.blog.app_paginated:app --port $PORT_PAG &
 PIDS+=($!)
 
 echo -e "${BLUE}Starting${NC} demo RPC MCP on port $PORT_RPC_MCP"
-PORT=$PORT_RPC_MCP uv run --with fastmcp python -m demo.rpc_mcp_server --http &
+PORT=$PORT_RPC_MCP uv run --with fastmcp python -m demo.rpc.mcp_server --http &
 PIDS+=($!)
 
 echo -e "${BLUE}Starting${NC} demo RPC FastAPI on port $PORT_RPC_FASTAPI"
-uv run uvicorn demo.rpc_fastapi:app --port $PORT_RPC_FASTAPI &
+uv run uvicorn demo.rpc.fastapi:app --port $PORT_RPC_FASTAPI &
 PIDS+=($!)
 
 echo -e "${BLUE}Starting${NC} demo RPC Voyager on port $PORT_RPC_VOYAGER"
-uv run uvicorn demo.rpc_voyager_demo:app --port $PORT_RPC_VOYAGER &
+uv run uvicorn demo.rpc.voyager_demo:app --port $PORT_RPC_VOYAGER &
 PIDS+=($!)
 
 echo ""

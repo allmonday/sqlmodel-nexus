@@ -22,9 +22,9 @@ Authentication:
         }
 """
 
-from auth_demo.auth import MCPAuthMiddleware
-from auth_demo.database import async_session, init_db
-from auth_demo.models import BaseEntity
+from demo.auth.auth import MCPAuthMiddleware
+from demo.blog.database import async_session, init_db
+from demo.blog.models import BaseEntity
 from sqlmodel_nexus.mcp import create_mcp_server
 
 

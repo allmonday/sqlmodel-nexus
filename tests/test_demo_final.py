@@ -1,7 +1,7 @@
 """Test standard queries in demo."""
 
-from demo.database import async_session
-from demo.models import BaseEntity
+from demo.blog.database import async_session
+from demo.blog.models import BaseEntity
 from sqlmodel_nexus import AutoQueryConfig, GraphQLHandler
 
 config = AutoQueryConfig(

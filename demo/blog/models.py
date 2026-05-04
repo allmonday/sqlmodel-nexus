@@ -67,7 +67,7 @@ class User(BaseEntity, table=True):
     @query
     async def get_users(cls, limit: int = 10) -> list["User"]:
         """Get all users with optional limit."""
-        from demo.database import async_session
+        from demo.blog.database import async_session
 
         async with async_session() as session:
             stmt = select(cls).limit(limit)
@@ -77,7 +77,7 @@ class User(BaseEntity, table=True):
     @query
     async def get_user(cls, id: int) -> Optional["User"]:
         """Get a user by ID."""
-        from demo.database import async_session
+        from demo.blog.database import async_session
 
         async with async_session() as session:
             stmt = select(cls).where(cls.id == id)
@@ -87,7 +87,7 @@ class User(BaseEntity, table=True):
     @mutation
     async def create_user(cls, name: str, email: str) -> "User":
         """Create a new user (idempotent)."""
-        from demo.database import async_session
+        from demo.blog.database import async_session
 
         async with async_session() as session:
             existing = await session.exec(select(cls).where(cls.email == email))
@@ -108,7 +108,7 @@ class User(BaseEntity, table=True):
     @mutation
     async def create_user_with_input(cls, input: CreateUserInput) -> "User":
         """Create a new user using Input type (idempotent)."""
-        from demo.database import async_session
+        from demo.blog.database import async_session
 
         async with async_session() as session:
             existing = await session.exec(select(cls).where(cls.email == input.email))
@@ -129,7 +129,7 @@ class User(BaseEntity, table=True):
     @mutation
     async def add_favorite(cls, user_id: int, post_id: int) -> "User":
         """Add a post to user's favorites (idempotent)."""
-        from demo.database import async_session
+        from demo.blog.database import async_session
 
         async with async_session() as session:
             user = await session.get(cls, user_id)
@@ -151,7 +151,7 @@ class User(BaseEntity, table=True):
     @mutation
     async def remove_favorite(cls, user_id: int, post_id: int) -> bool:
         """Remove a post from user's favorites."""
-        from demo.database import async_session
+        from demo.blog.database import async_session
 
         async with async_session() as session:
             user = await session.get(cls, user_id)
@@ -196,7 +196,7 @@ class Post(BaseEntity, table=True):
     @query
     async def get_posts(cls, limit: int = 10) -> list["Post"]:
         """Get all posts with optional limit."""
-        from demo.database import async_session
+        from demo.blog.database import async_session
 
         async with async_session() as session:
             stmt = select(cls).limit(limit)
@@ -206,7 +206,7 @@ class Post(BaseEntity, table=True):
     @query
     async def get_post(cls, id: int) -> Optional["Post"]:
         """Get a post by ID."""
-        from demo.database import async_session
+        from demo.blog.database import async_session
 
         async with async_session() as session:
             stmt = select(cls).where(cls.id == id)
@@ -218,7 +218,7 @@ class Post(BaseEntity, table=True):
         cls, author_id: int, limit: int = 10
     ) -> list["Post"]:
         """Get posts by author ID."""
-        from demo.database import async_session
+        from demo.blog.database import async_session
 
         async with async_session() as session:
             stmt = select(cls).where(cls.author_id == author_id).limit(limit)
@@ -228,7 +228,7 @@ class Post(BaseEntity, table=True):
     @mutation
     async def create_post(cls, title: str, content: str, author_id: int) -> "Post":
         """Create a new post (idempotent)."""
-        from demo.database import async_session
+        from demo.blog.database import async_session
 
         async with async_session() as session:
             existing = await session.exec(
@@ -251,7 +251,7 @@ class Post(BaseEntity, table=True):
     @mutation
     async def create_post_with_input(cls, input: CreatePostInput) -> "Post":
         """Create a new post using Input type (idempotent)."""
-        from demo.database import async_session
+        from demo.blog.database import async_session
 
         async with async_session() as session:
             existing = await session.exec(
@@ -289,7 +289,7 @@ class Comment(BaseEntity, table=True):
     @query
     async def get_comments(cls, limit: int = 10) -> list["Comment"]:
         """Get all comments with optional limit."""
-        from demo.database import async_session
+        from demo.blog.database import async_session
 
         async with async_session() as session:
             stmt = select(cls).limit(limit)
@@ -299,7 +299,7 @@ class Comment(BaseEntity, table=True):
     @query
     async def get_comment(cls, id: int) -> Optional["Comment"]:
         """Get a comment by ID."""
-        from demo.database import async_session
+        from demo.blog.database import async_session
 
         async with async_session() as session:
             stmt = select(cls).where(cls.id == id)
@@ -311,7 +311,7 @@ class Comment(BaseEntity, table=True):
         cls, post_id: int, limit: int = 10
     ) -> list["Comment"]:
         """Get comments by post ID."""
-        from demo.database import async_session
+        from demo.blog.database import async_session
 
         async with async_session() as session:
             stmt = select(cls).where(cls.post_id == post_id).limit(limit)
@@ -323,7 +323,7 @@ class Comment(BaseEntity, table=True):
         cls, author_id: int, limit: int = 10
     ) -> list["Comment"]:
         """Get comments by author ID."""
-        from demo.database import async_session
+        from demo.blog.database import async_session
 
         async with async_session() as session:
             stmt = select(cls).where(cls.author_id == author_id).limit(limit)
@@ -335,7 +335,7 @@ class Comment(BaseEntity, table=True):
         cls, content: str, post_id: int, author_id: int
     ) -> "Comment":
         """Create a new comment (idempotent)."""
-        from demo.database import async_session
+        from demo.blog.database import async_session
 
         async with async_session() as session:
             existing = await session.exec(
