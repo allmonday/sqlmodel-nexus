@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.3.0
+
+### New Feature: Voyager Visualization
+
+Migrated fastapi-voyager's interactive visualization into sqlmodel-nexus, decoupled from FastAPI route introspection. Visualizes RPC service structure and ER diagrams from ErManager.
+
+**New package `sqlmodel_nexus.voyager`:**
+
+| Export | Purpose |
+|--------|---------|
+| `create_rpc_voyager` | Create a FastAPI ASGI sub-app for interactive visualization |
+
+**Voyager features:**
+- RPC service graph: Service→Tag, Method→Route, DTO→SchemaNode mapping
+- ER diagram: renders entities and relationships from ErManager
+- DOT graph rendering via Jinja2 templates + Graphviz WASM frontend
+- REST endpoints: `/dot`, `/dot-search`, `/er-diagram`, `/source`, `/vscode-link`
+- Configurable: module colors, field visibility, theme color, initial page policy
+- GZip middleware support
+
+**ErManager new public methods:**
+- `get_all_entities()` — return all registered entity classes
+- `get_all_relationships()` — return full relationship registry
+
+**Public API:**
+- `create_rpc_voyager` accepts `list[RpcServiceConfig]` (reusable with `create_rpc_mcp_server`)
+
+### Demos
+
+- **`demo/rpc_voyager_demo.py`** — Voyager UI mounted on FastAPI, with 8 entities and 12 relationships (port 8008)
+- Demo entities expanded: Project, Sprint, Task, User, Comment, Label, TaskLabel, Tag
+- Update `start_all.sh` with RPC Voyager (port 8008)
+
+### Dependencies
+
+- Add `jinja2>=3.0` for DOT template rendering
+
 ## 1.2.0
 
 ### New Feature: RPC Services
