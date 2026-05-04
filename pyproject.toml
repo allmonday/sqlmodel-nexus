@@ -23,6 +23,7 @@ dependencies = [
     "uvicorn>=0.41.0",
     "greenlet>=3.3.2",
     "aiodataloader>=0.4.3",
+    "jinja2>=3.0",
 ]
 
 [project.optional-dependencies]

@@ -381,6 +381,14 @@ class ErManager:
         """Get all registered relationships for an entity."""
         return self._registry.get(entity, {})
 
+    def get_all_entities(self) -> list[type[SQLModel]]:
+        """Get all registered entity classes."""
+        return list(self._registry.keys())
+
+    def get_all_relationships(self) -> dict[type[SQLModel], dict[str, RelationshipInfo]]:
+        """Get the complete relationship registry."""
+        return dict(self._registry)
+
     def get_relationship(
         self, entity: type[SQLModel], name: str
     ) -> RelationshipInfo | None:

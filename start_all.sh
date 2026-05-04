@@ -24,8 +24,9 @@ PORT_MULTI_MCP=8004
 PORT_PAG=8005
 PORT_RPC_MCP=8006
 PORT_RPC_FASTAPI=8007
+PORT_RPC_VOYAGER=8008
 
-ALL_PORTS=($PORT_DEMO $PORT_CORE_API $PORT_AUTH_GQL $PORT_AUTH_MCP $PORT_MULTI_MCP $PORT_PAG $PORT_RPC_MCP $PORT_RPC_FASTAPI)
+ALL_PORTS=($PORT_DEMO $PORT_CORE_API $PORT_AUTH_GQL $PORT_AUTH_MCP $PORT_MULTI_MCP $PORT_PAG $PORT_RPC_MCP $PORT_RPC_FASTAPI $PORT_RPC_VOYAGER)
 
 PIDS=()
 
@@ -124,6 +125,10 @@ echo -e "${BLUE}Starting${NC} demo RPC FastAPI on port $PORT_RPC_FASTAPI"
 uv run uvicorn demo.rpc_fastapi:app --port $PORT_RPC_FASTAPI &
 PIDS+=($!)
 
+echo -e "${BLUE}Starting${NC} demo RPC Voyager on port $PORT_RPC_VOYAGER"
+uv run uvicorn demo.rpc_voyager_demo:app --port $PORT_RPC_VOYAGER &
+PIDS+=($!)
+
 echo ""
 
 # Wait for all services to be ready
@@ -136,6 +141,7 @@ wait_for_port $PORT_MULTI_MCP "multi-app MCP" || true
 wait_for_port $PORT_PAG "demo paginated"     || true
 wait_for_port $PORT_RPC_MCP "demo RPC MCP"   || true
 wait_for_port $PORT_RPC_FASTAPI "demo RPC FastAPI" || true
+wait_for_port $PORT_RPC_VOYAGER "demo RPC Voyager" || true
 
 echo ""
 
@@ -153,6 +159,7 @@ printf "  %-20s %-8s %s\n" "multi-app MCP" "$PORT_MULTI_MCP" "http://localhost:$
 printf "  %-20s %-8s %s\n" "demo paginated" "$PORT_PAG" "http://localhost:$PORT_PAG/graphql"
 printf "  %-20s %-8s %s\n" "demo RPC MCP" "$PORT_RPC_MCP" "http://localhost:$PORT_RPC_MCP/mcp"
 printf "  %-20s %-8s %s\n" "demo RPC FastAPI" "$PORT_RPC_FASTAPI" "http://localhost:$PORT_RPC_FASTAPI/api/sprints"
+printf "  %-20s %-8s %s\n" "demo RPC Voyager" "$PORT_RPC_VOYAGER" "http://localhost:$PORT_RPC_VOYAGER/voyager"
 echo "=============================================="
 echo ""
 echo -e "${YELLOW}Press Ctrl+C to stop all services${NC}"

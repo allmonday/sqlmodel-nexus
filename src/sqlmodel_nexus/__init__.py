@@ -68,6 +68,7 @@ from sqlmodel_nexus.rpc import RpcService, RpcServiceConfig, create_rpc_mcp_serv
 from sqlmodel_nexus.sdl_generator import SDLGenerator
 from sqlmodel_nexus.standard_queries import AutoQueryConfig, add_standard_queries
 from sqlmodel_nexus.subset import DefineSubset, SubsetConfig, build_dto_select
+from sqlmodel_nexus.voyager import create_rpc_voyager
 
 __all__ = [
     # Version
@@ -101,4 +102,6 @@ __all__ = [
     "RpcService",
     "RpcServiceConfig",
     "create_rpc_mcp_server",
+    # Voyager visualization
+    "create_rpc_voyager",
 ]
