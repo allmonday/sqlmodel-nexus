@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import json
 from collections.abc import Callable
 from enum import Enum
 from typing import TYPE_CHECKING, Any, get_type_hints
@@ -375,8 +376,8 @@ class IntrospectionGenerator:
 
             type_hint = hints.get(param_name)
             required = param.default == inspect.Parameter.empty
-            # 提取参数默认值
-            default_value = None if required else repr(param.default)
+            # 提取参数默认值 (GraphQL literal format)
+            default_value = None if required else self._format_default_value(param.default)
             arg = self._build_input_value(
                 param_name, type_hint, default_value=default_value, required=required
             )
@@ -524,6 +525,15 @@ class IntrospectionGenerator:
             "type": type_ref,
             "defaultValue": default_value,
         }
+
+    @staticmethod
+    def _format_default_value(value: Any) -> str:
+        """Format a Python default value as a GraphQL literal string.
+
+        Uses json.dumps which produces valid GraphQL literals for
+        common types (strings, numbers, booleans, null).
+        """
+        return json.dumps(value)
 
     def _collect_enum_types(self) -> dict[str, type[Enum]]:
         """Collect all enum types used in entities."""

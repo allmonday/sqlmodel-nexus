@@ -41,6 +41,42 @@ class IntrospectionUser(IntrospectionBase, table=True):
 
 
 # ---------------------------------------------------------------------------
+# Entity with various default value types for regression testing
+# ---------------------------------------------------------------------------
+
+
+class IntrospectionConfig(IntrospectionBase, table=True):
+    """Entity with various default value types for regression testing."""
+    __tablename__ = "introspection_config"
+    id: int = Field(default=None, primary_key=True)
+    key: str
+    value: str
+
+    @mutation
+    def create_config(
+        cls,
+        key: str,
+        value: str = "default",
+        priority: int = 5,
+        score: float = 1.0,
+        is_active: bool = True,
+        tag: str | None = None,
+        tags: list[str] = [],
+    ) -> "IntrospectionConfig":
+        return cls(key=key, value=value)
+
+    @query
+    def get_configs(
+        cls,
+        status: str = "active",
+        enabled: bool = False,
+        threshold: float = 0.5,
+        fallback: str | None = None,
+    ) -> list["IntrospectionConfig"]:
+        return []
+
+
+# ---------------------------------------------------------------------------
 # Entities with FK + Relationship for FK filtering tests
 # ---------------------------------------------------------------------------
 
@@ -578,3 +614,119 @@ class TestPaginationIntrospection:
         assert "author_id" not in field_names
         assert "id" in field_names
         assert "title" in field_names
+
+
+class TestDefaultValueFormat:
+    """Regression tests for defaultValue format in introspection.
+
+    Ensures that default values are serialized as valid GraphQL literals
+    (via json.dumps), not Python repr strings. This prevents buildClientSchema
+    from graphql-js (used by GraphiQL) from failing with syntax errors.
+
+    Bug: _build_method_field was using repr(param.default) which produced
+    Python-formatted strings like 'planning' (single quotes) and None,
+    instead of valid GraphQL literals like "planning" (double quotes) and null.
+    """
+
+    @pytest.fixture
+    def handler(self) -> GraphQLHandler:
+        return GraphQLHandler(base=IntrospectionBase)
+
+    @pytest.fixture
+    def generator(self, handler: GraphQLHandler) -> IntrospectionGenerator:
+        return handler._introspection_generator
+
+    def _get_mutation_field(self, schema: dict, field_name: str) -> dict:
+        mutation_type = next(t for t in schema["types"] if t["name"] == "Mutation")
+        return next(f for f in mutation_type["fields"] if f["name"] == field_name)
+
+    def _get_query_field(self, schema: dict, field_name: str) -> dict:
+        query_type = next(t for t in schema["types"] if t["name"] == "Query")
+        return next(f for f in query_type["fields"] if f["name"] == field_name)
+
+    def test_string_default_uses_json_format(self, generator: IntrospectionGenerator):
+        """String defaults must use double-quoted JSON format, not Python single quotes."""
+        schema = generator.generate()
+        field = self._get_mutation_field(schema, "introspectionConfigCreateConfig")
+        value_arg = next(a for a in field["args"] if a["name"] == "value")
+
+        assert value_arg["defaultValue"] == '"default"'
+        assert "'" not in value_arg["defaultValue"]
+
+    def test_none_default_produces_null(self, generator: IntrospectionGenerator):
+        """None defaults must produce GraphQL 'null', not Python 'None'."""
+        schema = generator.generate()
+        field = self._get_mutation_field(schema, "introspectionConfigCreateConfig")
+        tag_arg = next(a for a in field["args"] if a["name"] == "tag")
+
+        assert tag_arg["defaultValue"] == "null"
+        assert tag_arg["defaultValue"] != "None"
+
+    def test_int_default_format(self, generator: IntrospectionGenerator):
+        """Integer defaults must be valid GraphQL Int literals."""
+        schema = generator.generate()
+        field = self._get_mutation_field(schema, "introspectionConfigCreateConfig")
+        priority_arg = next(a for a in field["args"] if a["name"] == "priority")
+
+        assert priority_arg["defaultValue"] == "5"
+
+    def test_float_default_format(self, generator: IntrospectionGenerator):
+        """Float defaults must be valid GraphQL Float literals."""
+        schema = generator.generate()
+        field = self._get_mutation_field(schema, "introspectionConfigCreateConfig")
+        score_arg = next(a for a in field["args"] if a["name"] == "score")
+
+        assert score_arg["defaultValue"] == "1.0"
+
+    def test_bool_true_default_format(self, generator: IntrospectionGenerator):
+        """Boolean True defaults must be GraphQL 'true', not Python 'True'."""
+        schema = generator.generate()
+        field = self._get_mutation_field(schema, "introspectionConfigCreateConfig")
+        is_active_arg = next(a for a in field["args"] if a["name"] == "is_active")
+
+        assert is_active_arg["defaultValue"] == "true"
+        assert is_active_arg["defaultValue"] != "True"
+
+    def test_bool_false_default_format(self, generator: IntrospectionGenerator):
+        """Boolean False defaults must be GraphQL 'false', not Python 'False'."""
+        schema = generator.generate()
+        field = self._get_query_field(schema, "introspectionConfigGetConfigs")
+        enabled_arg = next(a for a in field["args"] if a["name"] == "enabled")
+
+        assert enabled_arg["defaultValue"] == "false"
+        assert enabled_arg["defaultValue"] != "False"
+
+    def test_list_default_format(self, generator: IntrospectionGenerator):
+        """List defaults must be valid GraphQL list literals."""
+        schema = generator.generate()
+        field = self._get_mutation_field(schema, "introspectionConfigCreateConfig")
+        tags_arg = next(a for a in field["args"] if a["name"] == "tags")
+
+        assert tags_arg["defaultValue"] == "[]"
+
+    def test_build_client_schema_succeeds(self, generator: IntrospectionGenerator):
+        """Full introspection result must be consumable by graphql build_client_schema.
+
+        This is the critical end-to-end regression check. If defaultValue format
+        is wrong, buildClientSchema will raise a GraphQLError.
+        """
+        from graphql import build_client_schema
+
+        schema = generator.generate()
+        gql_schema = build_client_schema({"__schema": schema})
+
+        assert gql_schema is not None
+        assert "Query" in gql_schema.type_map
+        assert "Mutation" in gql_schema.type_map
+        assert "IntrospectionConfig" in gql_schema.type_map
+
+    def test_format_default_value_static_method(self):
+        """Unit test for _format_default_value static method."""
+        assert IntrospectionGenerator._format_default_value("hello") == '"hello"'
+        assert IntrospectionGenerator._format_default_value(None) == "null"
+        assert IntrospectionGenerator._format_default_value(True) == "true"
+        assert IntrospectionGenerator._format_default_value(False) == "false"
+        assert IntrospectionGenerator._format_default_value(42) == "42"
+        assert IntrospectionGenerator._format_default_value(3.14) == "3.14"
+        assert IntrospectionGenerator._format_default_value([1, 2, 3]) == "[1, 2, 3]"
+        assert IntrospectionGenerator._format_default_value([]) == "[]"

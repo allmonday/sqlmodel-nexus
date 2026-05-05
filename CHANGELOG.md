@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.3.2
+
+### Bug Fix: Introspection defaultValue Format
+
+Fix `IntrospectionGenerator` default value serialization from Python `repr()` to JSON format (`json.dumps`), ensuring valid GraphQL literals in introspection results. Previously, `buildClientSchema` from graphql-js (used by GraphiQL) would fail with syntax errors due to Python-formatted strings like `'planning'` (single quotes) and `None` instead of `"planning"` and `null`.
+
+| Before (`repr`) | After (`json.dumps`) |
+|------------------|----------------------|
+| `'default'` | `"default"` |
+| `None` | `null` |
+| `True` | `true` |
+| `False` | `false` |
+| `5` | `5` |
+
+- Add `_format_default_value` static method to `IntrospectionGenerator`
+- Add `TestDefaultValueFormat` test class with 10 tests covering string, None, int, float, bool, list defaults and end-to-end `buildClientSchema` validation
+
+### Documentation
+
+- Update `llms-full.txt` to reflect current v1.3.1 API surface, including Core API, RPC + Voyager mode documentation
+
 ## 1.3.1
 
 ### Refactoring: Constant Extraction
