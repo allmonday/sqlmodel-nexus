@@ -22,12 +22,6 @@ from tests.conftest import (
 # ──────────────────────────────────────────────────────────
 
 class TestLoaderDepends:
-    def test_loader_returns_depends(self):
-        """Loader() should return a Depends instance."""
-        dep = Loader("owner")
-        assert isinstance(dep, Depends)
-        assert dep.dependency == "owner"
-
     def test_loader_with_none(self):
         """Loader(None) should return Depends with None dependency."""
         dep = Loader(None)
@@ -148,39 +142,6 @@ class TestLoaderWithDataLoaderClass:
         assert models[0].result == 11
         assert models[1].result == 12
         assert models[2].result == 13
-
-
-class TestLoaderWithStringName:
-    @pytest.mark.usefixtures("test_db")
-    async def test_loader_with_string_backward_compat(self):
-        """Loader('name') should still work for ErManager lookup."""
-
-        session_factory = get_test_session_factory()
-        registry = ErManager(
-            entities=[FixtureUser, FixtureSprint, FixtureTask],
-            session_factory=session_factory,
-        )
-
-        class UserDTO(DefineSubset):
-            __subset__ = (FixtureUser, ("id", "name"))
-
-        class TaskDTO(DefineSubset):
-            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
-            owner: UserDTO | None = None
-
-            def resolve_owner(self, loader=Loader("owner")):
-                return loader.load(self.owner_id)
-
-        async with session_factory() as session:
-            tasks = (await session.exec(select(FixtureTask))).all()
-
-        dtos = [
-            TaskDTO(id=t.id, title=t.title, owner_id=t.owner_id) for t in tasks
-        ]
-        result = await Resolver(registry).resolve(dtos)
-
-        # All tasks should have owners resolved
-        assert all(dto.owner is not None for dto in result)
 
 
 # ──────────────────────────────────────────────────────────

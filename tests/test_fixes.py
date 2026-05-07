@@ -65,10 +65,13 @@ class TestClassMetaCache:
     def test_resolve_param_info_cached(self):
         """Method parameter info should be pre-computed."""
 
+        async def test_batch_fn(keys):
+            return keys
+
         class ParamModel(BaseModel):
             value: str = ""
 
-            def resolve_value(self, context, loader=Loader("test")):
+            def resolve_value(self, context, loader=Loader(test_batch_fn)):
                 return "ok"
 
         _class_meta_cache.pop(ParamModel, None)

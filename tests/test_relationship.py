@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import BaseModel
 from sqlmodel import Field, SQLModel
 
 from sqlmodel_nexus import DefineSubset, ErDiagram, Relationship
-from sqlmodel_nexus.loader.registry import ErManager, _build_custom_relationship_info
+from sqlmodel_nexus.loader.registry import ErManager
 from sqlmodel_nexus.relationship import get_custom_relationships
-from sqlmodel_nexus.resolver import Loader, Resolver
+from sqlmodel_nexus.resolver import Resolver
 from tests.conftest import FixtureSprint, FixtureTask, FixtureUser
 
 # ──────────────────────────────────────────────────────────
@@ -352,125 +351,3 @@ class TestErManagerCustomRelationships:
 # ──────────────────────────────────────────────────────────
 # Tests: Custom relationships with resolve_* and implicit auto-load
 # ──────────────────────────────────────────────────────────
-
-
-class TestCustomRelationshipResolve:
-    @pytest.mark.usefixtures("test_db")
-    async def test_custom_many_to_one_with_resolve(self):
-        """Custom M2O relationship should work with resolve_* + Loader."""
-
-        async def user_loader(ids: list[int]) -> list:
-            return [
-                FixtureUser(id=1, name="Alice", email="alice@test.com") if k == 1
-                else FixtureUser(id=2, name="Bob", email="bob@test.com")
-                for k in ids
-            ]
-
-        registry = ErManager(
-            entities=[FixtureUser, FixtureSprint, FixtureTask],
-            session_factory=lambda: None,
-        )
-
-        custom_rel = Relationship(
-            fk="owner_id",
-            target=FixtureUser,
-            name="custom_owner",
-            loader=user_loader,
-        )
-        registry._registry[FixtureTask]["custom_owner"] = _build_custom_relationship_info(
-            custom_rel
-        )
-
-        class UserDTO(DefineSubset):
-            __subset__ = (FixtureUser, ("id", "name"))
-
-        class TaskDTO(DefineSubset):
-            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
-            custom_owner: UserDTO | None = None
-
-            def resolve_custom_owner(self, loader=Loader("custom_owner")):
-                return loader.load(self.owner_id)
-
-        dto = TaskDTO(id=1, title="Test", owner_id=1)
-        result = await Resolver(registry).resolve(dto)
-
-        assert result.custom_owner is not None
-        assert result.custom_owner.name == "Alice"
-
-    @pytest.mark.usefixtures("test_db")
-    async def test_custom_one_to_many_with_resolve(self):
-        """Custom O2M relationship with non-DTO type should use resolve_*."""
-
-        async def greeting_loader(ids: list[int]) -> list[list]:
-            return [[f"Greeting for {i}"] for i in ids]
-
-        registry = ErManager(
-            entities=[FixtureUser, FixtureSprint, FixtureTask],
-            session_factory=lambda: None,
-        )
-
-        custom_rel = Relationship(
-            fk="id",
-            target=list[FixtureSprint],
-            name="greetings",
-            loader=greeting_loader,
-        )
-        registry._registry[FixtureSprint]["greetings"] = _build_custom_relationship_info(
-            custom_rel
-        )
-
-        class SprintDTO(DefineSubset):
-            __subset__ = (FixtureSprint, ("id", "name"))
-            greetings: list[str] = []
-
-            def resolve_greetings(self, loader=Loader("greetings")):
-                return loader.load(self.id)
-
-        dto = SprintDTO(id=1, name="Sprint 1")
-        result = await Resolver(registry).resolve(dto)
-
-        assert len(result.greetings) == 1
-        assert result.greetings[0] == "Greeting for 1"
-
-    @pytest.mark.usefixtures("test_db")
-    async def test_custom_loader_returns_basemodel_with_resolve(self):
-        """Custom loader returning BaseModel instances via resolve_*."""
-
-        class InnerUserDTO(BaseModel):
-            id: int
-            name: str
-
-        async def user_loader(keys: list[int]) -> list:
-            return [InnerUserDTO(id=k, name=f"User{k}") for k in keys]
-
-        class UserDTO(BaseModel):
-            id: int
-            name: str
-
-        registry = ErManager(
-            entities=[FixtureUser, FixtureSprint, FixtureTask],
-            session_factory=lambda: None,
-        )
-
-        custom_rel = Relationship(
-            fk="owner_id",
-            target=FixtureUser,
-            name="custom_owner",
-            loader=user_loader,
-        )
-        registry._registry[FixtureTask]["custom_owner"] = _build_custom_relationship_info(
-            custom_rel
-        )
-
-        class TaskDTO(DefineSubset):
-            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
-            custom_owner: UserDTO | None = None
-
-            def resolve_custom_owner(self, loader=Loader("custom_owner")):
-                return loader.load(self.owner_id)
-
-        dto = TaskDTO(id=1, title="Test", owner_id=1)
-        result = await Resolver(registry).resolve(dto)
-
-        assert result.custom_owner is not None
-        assert result.custom_owner.name == "User1"

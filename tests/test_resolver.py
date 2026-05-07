@@ -6,17 +6,8 @@ import asyncio
 
 import pytest
 from pydantic import BaseModel
-from sqlmodel import select
 
-from sqlmodel_nexus.loader.registry import ErManager
-from sqlmodel_nexus.resolver import Loader, Resolver
-from sqlmodel_nexus.subset import DefineSubset
-from tests.conftest import (
-    FixtureSprint,
-    FixtureTask,
-    FixtureUser,
-    get_test_session_factory,
-)
+from sqlmodel_nexus.resolver import Resolver
 
 # ──────────────────────────────────────────────────────────
 # Test: basic resolve_* with custom loaders
@@ -156,112 +147,10 @@ class TestResolverPost:
 
 
 # ──────────────────────────────────────────────────────────
-# Test: Loader integration with ErManager
-# ──────────────────────────────────────────────────────────
-
-class TestResolverLoader:
-    @pytest.mark.usefixtures("test_db")
-    async def test_loader_with_registry(self):
-        """resolve_* should receive DataLoader from ErManager."""
-
-        session_factory = get_test_session_factory()
-        registry = ErManager(
-            entities=[FixtureUser, FixtureSprint, FixtureTask],
-            session_factory=session_factory,
-        )
-
-        class UserDTO(DefineSubset):
-            __subset__ = (FixtureUser, ("id", "name"))
-
-        class TaskDTO(DefineSubset):
-            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
-            owner: UserDTO | None = None
-
-            def resolve_owner(self, loader=Loader("owner")):
-                return loader.load(self.owner_id)
-
-        # Get tasks from DB — construct DTOs from scalar fields only
-        async with session_factory() as session:
-            tasks = (await session.exec(select(FixtureTask))).all()
-
-        dtos = [
-            TaskDTO(id=t.id, title=t.title, owner_id=t.owner_id) for t in tasks
-        ]
-        result = await Resolver(registry).resolve(dtos)
-
-        # Verify owners are resolved to UserDTO instances
-        owner_names = {dto.owner.name for dto in result if dto.owner is not None}
-        assert "Alice" in owner_names or "Bob" in owner_names
-
-    @pytest.mark.usefixtures("test_db")
-    async def test_loader_batch_loading(self):
-        """Multiple items should trigger batch loading (single query per relationship)."""
-
-        session_factory = get_test_session_factory()
-        registry = ErManager(
-            entities=[FixtureUser, FixtureSprint, FixtureTask],
-            session_factory=session_factory,
-        )
-
-        class UserDTO(DefineSubset):
-            __subset__ = (FixtureUser, ("id", "name"))
-
-        class TaskDTO(DefineSubset):
-            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
-            owner: UserDTO | None = None
-
-            def resolve_owner(self, loader=Loader("owner")):
-                return loader.load(self.owner_id)
-
-        async with session_factory() as session:
-            tasks = (await session.exec(select(FixtureTask))).all()
-
-        dtos = [
-            TaskDTO(id=t.id, title=t.title, owner_id=t.owner_id) for t in tasks
-        ]
-        result = await Resolver(registry).resolve(dtos)
-
-        # All 4 tasks have owners resolved (2 unique users)
-        assert all(dto.owner is not None for dto in result)
-
-
-# ──────────────────────────────────────────────────────────
 # Test: nested resolve with DefineSubset
 # ──────────────────────────────────────────────────────────
 
 class TestResolverNested:
-    @pytest.mark.usefixtures("test_db")
-    async def test_nested_resolve_with_subset(self):
-        """Resolve nested DefineSubset DTOs with DataLoader."""
-
-        session_factory = get_test_session_factory()
-        registry = ErManager(
-            entities=[FixtureUser, FixtureSprint, FixtureTask],
-            session_factory=session_factory,
-        )
-
-        class UserDTO(DefineSubset):
-            __subset__ = (FixtureUser, ("id", "name"))
-
-        class TaskDTO(DefineSubset):
-            __subset__ = (FixtureTask, ("id", "title", "owner_id"))
-            owner: UserDTO | None = None
-
-            def resolve_owner(self, loader=Loader("owner")):
-                return loader.load(self.owner_id)
-
-        async with session_factory() as session:
-            tasks = (await session.exec(select(FixtureTask))).all()
-
-        dtos = [
-            TaskDTO(id=t.id, title=t.title, owner_id=t.owner_id) for t in tasks
-        ]
-        result = await Resolver(registry).resolve(dtos)
-
-        # Verify nested owner is resolved
-        assert result[0].owner is not None
-        assert result[0].owner.name in ("Alice", "Bob")
-
     @pytest.mark.usefixtures("test_db")
     async def test_post_on_nested_subset(self):
         """post_* on DefineSubset should work after resolve_*."""

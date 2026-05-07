@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.3.3
+
+### Breaking Change: Remove `Loader(str)` Support
+
+Remove the string-based `Loader('relationship_name')` pattern that performed ErManager lookup at resolve time. Only `Loader(DataLoaderClass)` and `Loader(async_callable)` are now supported.
+
+**Migration:**
+
+```python
+# Before
+def resolve_owner(self, loader=Loader("owner")):
+    return loader.load(self.owner_id)
+
+# After — use DataLoader class or async callable
+def resolve_owner(self, loader=Loader(UserLoader)):
+    return loader.load(self.owner_id)
+```
+
+Note: Implicit auto-loading (field name matches relationship + compatible type) already handles the common case without any `resolve_*` method.
+
+**Changes:**
+- Remove `isinstance(dep_val, str)` branch from `Resolver._resolve_dependency`
+- Remove string-based examples from `Loader` docstring
+- Remove `TestLoaderWithStringName`, `TestResolverLoader`, `TestCustomRelationshipResolve` test classes
+- Update `TestClassMetaCache` to use async callable instead of string dependency
+
 ## 1.3.2
 
 ### Bug Fix: Introspection defaultValue Format

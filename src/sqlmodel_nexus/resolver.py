@@ -64,15 +64,10 @@ def Loader(dependency=None):
 
     Args:
         dependency: One of:
-            - str: relationship name in ErManager
             - DataLoader subclass: instantiated and cached per Resolver
             - async callable: wrapped in DataLoader(batch_load_fn=...)
 
     Usage::
-
-        # By name (ErManager lookup)
-        def resolve_owner(self, loader=Loader('owner')):
-            return loader.load(self.owner_id)
 
         # By DataLoader class
         def resolve_owner(self, loader=Loader(UserLoader)):
@@ -272,8 +267,6 @@ class Resolver:
         dep_val = dep.dependency
         if dep_val is None:
             return None
-        if isinstance(dep_val, str):
-            return self._get_loader(node, dep_val)
         if isinstance(dep_val, type) and issubclass(dep_val, DataLoader):
             return self._get_or_create_loader(dep_val)
         if callable(dep_val):
