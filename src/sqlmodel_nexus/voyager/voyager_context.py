@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from sqlmodel_nexus.loader.registry import ErManager
-from sqlmodel_nexus.rpc.types import RpcServiceConfig
+from sqlmodel_nexus.rpc.business import RpcService
 from sqlmodel_nexus.voyager.er_diagram_dot import ErDiagramDotBuilder
 from sqlmodel_nexus.voyager.render import Renderer
 from sqlmodel_nexus.voyager.render_style import DEFAULT_PRIMARY
@@ -31,7 +31,7 @@ class VoyagerContext:
 
     def __init__(
         self,
-        configs: list[RpcServiceConfig],
+        services: list[type[RpcService]],
         er_manager: ErManager | None = None,
         name: str = "RPC API",
         module_color: dict[str, str] | None = None,
@@ -39,7 +39,7 @@ class VoyagerContext:
         online_repo_url: str | None = None,
         version: str = "1.0.0",
     ):
-        self.configs = configs
+        self.services = services
         self.er_manager = er_manager
         self.name = name
         self.module_color = module_color or {}
@@ -55,7 +55,7 @@ class VoyagerContext:
             "theme_color": self.theme_color,
         }
         config.update(kwargs)
-        return RpcVoyager(self.configs, **config)
+        return RpcVoyager(self.services, **config)
 
     def analyze_and_get_dot(self) -> tuple[str, list[Tag], list[SchemaNode]]:
         """Analyze RPC services and return dot graph, tags, and schemas."""
@@ -220,7 +220,7 @@ class VoyagerContext:
           - Full class name: "module.path.ClassName" (imported directly)
         """
         # Try RPC route ID first: "service_name.method_name"
-        service_map = {cfg["name"]: cfg["service"] for cfg in self.configs}
+        service_map = {svc.__name__: svc for svc in self.services}
         dot_idx = schema_name.find(".")
         if dot_idx > 0:
             svc_name = schema_name[:dot_idx]

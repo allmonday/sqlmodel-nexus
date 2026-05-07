@@ -18,7 +18,7 @@ from demo.core_api.database import async_session, init_db
 from demo.core_api.dtos import SprintDetail, SprintSummary, TaskSummary
 from demo.core_api.models import Sprint, Task, User
 from sqlmodel_nexus import ErManager, build_dto_select
-from sqlmodel_nexus.rpc import RpcService, RpcServiceConfig, create_rpc_mcp_server
+from sqlmodel_nexus.rpc import RpcService, create_rpc_mcp_server
 
 # ──────────────────────────────────────────────────
 # ErManager & Resolver
@@ -141,24 +141,7 @@ def main() -> None:
     asyncio.run(init_db())
 
     mcp = create_rpc_mcp_server(
-        services=[
-            RpcServiceConfig(
-                name="user",
-                service=UserService,
-                description="User management — query users",
-            ),
-            RpcServiceConfig(
-                name="task",
-                service=TaskService,
-                description="Task management — query tasks with auto-loaded owner",
-            ),
-            RpcServiceConfig(
-                name="sprint",
-                service=SprintService,
-                description="Sprint management — query sprints with task statistics, "
-                "cross-layer data flow (ExposeAs/SendTo/Collector)",
-            ),
-        ],
+        services=[UserService, TaskService, SprintService],
         name="Core API RPC Demo",
     )
 

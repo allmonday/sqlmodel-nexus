@@ -29,7 +29,6 @@ from demo.core_api.models import (
 )
 from demo.rpc.mcp_server import SprintService, TaskService, UserService
 from sqlmodel_nexus import ErManager
-from sqlmodel_nexus.rpc.types import RpcServiceConfig
 from sqlmodel_nexus.voyager import create_rpc_voyager
 
 # ──────────────────────────────────────────────────
@@ -45,22 +44,8 @@ er = ErManager(
 # Voyager app
 # ──────────────────────────────────────────────────
 
-services: list[RpcServiceConfig] = [
-    {"name": "user", "service": UserService, "description": "User management"},
-    {
-        "name": "task",
-        "service": TaskService,
-        "description": "Task management with auto-loaded owner",
-    },
-    {
-        "name": "sprint",
-        "service": SprintService,
-        "description": "Sprint management with task statistics",
-    },
-]
-
 voyager_app = create_rpc_voyager(
-    services=services,
+    services=[UserService, TaskService, SprintService],
     er_manager=er,
     name="Core API RPC Demo",
 )

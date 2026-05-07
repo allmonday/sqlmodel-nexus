@@ -8,9 +8,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from sqlmodel_nexus.rpc.business import RPC_METHODS_ATTR  # noqa: F401
+from sqlmodel_nexus.rpc.business import RPC_METHODS_ATTR, RpcService  # noqa: F401
 from sqlmodel_nexus.rpc.introspector import ServiceIntrospector
-from sqlmodel_nexus.rpc.types import RpcServiceConfig
 from sqlmodel_nexus.subset import SUBSET_REFERENCE  # noqa: F401
 from sqlmodel_nexus.voyager.filter import filter_graph
 from sqlmodel_nexus.voyager.render import Renderer
@@ -44,7 +43,7 @@ class RpcVoyager:
 
     def __init__(
         self,
-        configs: list[RpcServiceConfig],
+        services: list[type[RpcService]],
         *,
         schema: str | None = None,
         schema_field: str | None = None,
@@ -56,8 +55,8 @@ class RpcVoyager:
         show_module: bool = True,
         theme_color: str | None = None,
     ):
-        self.configs = configs
-        self.introspector = ServiceIntrospector(configs)
+        self.services = services
+        self.introspector = ServiceIntrospector(services)
 
         self.routes: list[Route] = []
         self.nodes: list[SchemaNode] = []
@@ -83,9 +82,8 @@ class RpcVoyager:
         """Analyze all RPC services and build graph data."""
         schemas: list[type[BaseModel]] = []
 
-        for config in self.configs:
-            service_name = config["name"]
-            service_cls = config["service"]
+        for service_cls in self.services:
+            service_name = service_cls.__name__
             tag_id = f'tag__{service_name}'
             tag_obj = Tag(id=tag_id, name=service_name, routes=[])
             self.tags.append(tag_obj)

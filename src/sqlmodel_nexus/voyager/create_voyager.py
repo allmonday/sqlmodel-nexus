@@ -11,7 +11,7 @@ from typing import Any, Literal
 from pydantic import BaseModel as PydanticModel
 
 from sqlmodel_nexus.loader.registry import ErManager
-from sqlmodel_nexus.rpc.types import RpcServiceConfig
+from sqlmodel_nexus.rpc.business import RpcService
 from sqlmodel_nexus.voyager.type import CoreData, SchemaNode, Tag
 from sqlmodel_nexus.voyager.voyager_context import (
     STATIC_FILES_PATH,
@@ -76,7 +76,7 @@ class SourcePayload(PydanticModel):
 
 
 def create_rpc_voyager(
-    services: list[RpcServiceConfig],
+    services: list[type[RpcService]],
     er_manager: ErManager | None = None,
     name: str = "RPC API",
     module_color: dict[str, str] | None = None,
@@ -95,17 +95,14 @@ def create_rpc_voyager(
         from sqlmodel_nexus.voyager import create_rpc_voyager
 
         voyager_app = create_rpc_voyager(
-            services=[
-                {"name": "user", "service": UserService},
-                {"name": "task", "service": TaskService},
-            ],
+            services=[UserService, TaskService],
             er_manager=er,
             name="My Project API",
         )
         app.mount("/voyager", voyager_app)
 
     Args:
-        services: List of RpcServiceConfig dicts with name, service, description.
+        services: List of RpcService subclasses.
         er_manager: Optional ErManager for ER diagram visualization.
         name: Display name for the voyager UI.
         module_color: Optional color mapping for modules.
@@ -123,7 +120,7 @@ def create_rpc_voyager(
     from starlette.middleware.gzip import GZipMiddleware
 
     ctx = VoyagerContext(
-        configs=services,
+        services=services,
         er_manager=er_manager,
         name=name,
         module_color=module_color,

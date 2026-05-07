@@ -19,7 +19,7 @@ from sqlmodel_nexus.mcp.types.errors import (
     create_error_response,
     create_success_response,
 )
-from sqlmodel_nexus.rpc.business import RPC_METHODS_ATTR  # noqa: F401
+from sqlmodel_nexus.rpc.business import RPC_METHODS_ATTR, RpcService  # noqa: F401
 from sqlmodel_nexus.rpc.introspector import ServiceIntrospector
 
 if TYPE_CHECKING:
@@ -33,14 +33,14 @@ _RPC_INVALID_PARAMS = "INVALID_PARAMS"
 
 
 def create_rpc_mcp_server(
-    services: list[dict[str, Any]],
+    services: list[type[RpcService]],
     name: str = "RPC API",
 ) -> FastMCP:
     """Create an MCP server that exposes RPC services as tools.
 
     Args:
-        services: List of RpcServiceConfig dicts. Each must have
-            ``name`` and ``service`` keys.
+        services: List of RpcService subclasses. Name is derived from
+            ``__name__`` and description from ``__doc__``.
         name: Name of the MCP server (shown in MCP clients).
 
     Returns:
@@ -49,10 +49,7 @@ def create_rpc_mcp_server(
     Example::
 
         mcp = create_rpc_mcp_server(
-            services=[
-                {"name": "sprint", "service": SprintService,
-                 "description": "Sprint management"},
-            ],
+            services=[SprintService, TaskService],
             name="Project RPC API",
         )
         mcp.run()

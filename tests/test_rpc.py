@@ -13,7 +13,6 @@ from sqlmodel_nexus.rpc.introspector import (
     _type_to_sdl_name,
 )
 from sqlmodel_nexus.rpc.server import create_rpc_mcp_server
-from sqlmodel_nexus.rpc.types import RpcServiceConfig
 
 # ──────────────────────────────────────────────────
 # Test DTOs
@@ -181,12 +180,7 @@ class TestTypeToSdlName:
 
 
 def _make_introspector() -> ServiceIntrospector:
-    return ServiceIntrospector(
-        [
-            {"name": "user", "service": UserService, "description": "User ops"},
-            {"name": "task", "service": TaskService},
-        ]
-    )
+    return ServiceIntrospector([UserService, TaskService])
 
 
 class TestServiceIntrospector:
@@ -195,23 +189,23 @@ class TestServiceIntrospector:
         services = introspector.list_services()
         assert len(services) == 2
 
-        user_svc = next(s for s in services if s["name"] == "user")
-        assert user_svc["description"] == "User ops"
+        user_svc = next(s for s in services if s["name"] == "UserService")
+        assert user_svc["description"] == "User management service."
         assert user_svc["methods_count"] == 3
 
-        task_svc = next(s for s in services if s["name"] == "task")
+        task_svc = next(s for s in services if s["name"] == "TaskService")
         assert task_svc["methods_count"] == 2  # list_tasks + get_task (excludes _internal)
 
     def test_describe_service_methods(self):
         introspector = _make_introspector()
-        info = introspector.describe_service("user")
+        info = introspector.describe_service("UserService")
         assert info is not None
-        assert info["name"] == "user"
+        assert info["name"] == "UserService"
         assert len(info["methods"]) == 3
 
     def test_describe_service_signatures(self):
         introspector = _make_introspector()
-        info = introspector.describe_service("user")
+        info = introspector.describe_service("UserService")
         assert info is not None
 
         list_users = next(m for m in info["methods"] if m["name"] == "list_users")
@@ -228,7 +222,7 @@ class TestServiceIntrospector:
     def test_describe_service_types(self):
         """types field contains SDL type definitions for referenced DTOs."""
         introspector = _make_introspector()
-        info = introspector.describe_service("user")
+        info = introspector.describe_service("UserService")
         assert info is not None
 
         types_str = info["types"]
@@ -239,7 +233,7 @@ class TestServiceIntrospector:
     def test_describe_service_task_types(self):
         """types includes nested DTOs from return values."""
         introspector = _make_introspector()
-        info = introspector.describe_service("task")
+        info = introspector.describe_service("TaskService")
         assert info is not None
 
         types_str = info["types"]
@@ -249,7 +243,7 @@ class TestServiceIntrospector:
 
     def test_describe_service_with_params(self):
         introspector = _make_introspector()
-        info = introspector.describe_service("user")
+        info = introspector.describe_service("UserService")
         assert info is not None
 
         get_user = next(m for m in info["methods"] if m["name"] == "get_user")
@@ -262,12 +256,12 @@ class TestServiceIntrospector:
 
     def test_get_service(self):
         introspector = _make_introspector()
-        assert introspector.get_service("user") is UserService
+        assert introspector.get_service("UserService") is UserService
         assert introspector.get_service("nonexistent") is None
 
     def test_uses_class_docstring_as_description(self):
         introspector = _make_introspector()
-        info = introspector.describe_service("task")
+        info = introspector.describe_service("TaskService")
         assert info is not None
         assert info["description"] == "Task management service."
 
@@ -281,14 +275,7 @@ class TestRpcMcpServer:
     @pytest.fixture
     def mcp_server(self):
         return create_rpc_mcp_server(
-            services=[
-                RpcServiceConfig(
-                    name="user", service=UserService, description="User ops"
-                ),
-                RpcServiceConfig(
-                    name="task", service=TaskService, description="Task ops"
-                ),
-            ],
+            services=[UserService, TaskService],
             name="Test RPC API",
         )
 
@@ -308,11 +295,11 @@ class TestRpcMcpServer:
     async def test_describe_service_tool(self, mcp_server):
         """describe_service returns method details with SDL signatures."""
         result = await mcp_server.call_tool(
-            "describe_service", {"service_name": "user"}
+            "describe_service", {"service_name": "UserService"}
         )
         data = json.loads(result.content[0].text)
         assert data["success"] is True
-        assert data["data"]["name"] == "user"
+        assert data["data"]["name"] == "UserService"
         assert len(data["data"]["methods"]) == 3
         # Check that types field has SDL
         assert "type UserDTO" in data["data"]["types"]
@@ -331,7 +318,7 @@ class TestRpcMcpServer:
         """call_rpc works with no parameters."""
         result = await mcp_server.call_tool(
             "call_rpc",
-            {"service_name": "user", "method_name": "list_users", "params": "{}"},
+            {"service_name": "UserService", "method_name": "list_users", "params": "{}"},
         )
         data = json.loads(result.content[0].text)
         assert data["success"] is True
@@ -344,7 +331,7 @@ class TestRpcMcpServer:
         result = await mcp_server.call_tool(
             "call_rpc",
             {
-                "service_name": "user",
+                "service_name": "UserService",
                 "method_name": "get_user",
                 "params": json.dumps({"user_id": 1}),
             },
@@ -360,7 +347,7 @@ class TestRpcMcpServer:
         result = await mcp_server.call_tool(
             "call_rpc",
             {
-                "service_name": "user",
+                "service_name": "UserService",
                 "method_name": "get_user",
                 "params": json.dumps({"user_id": 999}),
             },
@@ -384,7 +371,7 @@ class TestRpcMcpServer:
         """call_rpc returns error for unknown method."""
         result = await mcp_server.call_tool(
             "call_rpc",
-            {"service_name": "user", "method_name": "nonexistent", "params": "{}"},
+            {"service_name": "UserService", "method_name": "nonexistent", "params": "{}"},
         )
         data = json.loads(result.content[0].text)
         assert data["success"] is False
@@ -394,7 +381,7 @@ class TestRpcMcpServer:
         """call_rpc returns error for invalid JSON params."""
         result = await mcp_server.call_tool(
             "call_rpc",
-            {"service_name": "user", "method_name": "list_users", "params": "invalid"},
+            {"service_name": "UserService", "method_name": "list_users", "params": "invalid"},
         )
         data = json.loads(result.content[0].text)
         assert data["success"] is False
@@ -404,7 +391,7 @@ class TestRpcMcpServer:
         """call_rpc returns error when params is not a dict."""
         result = await mcp_server.call_tool(
             "call_rpc",
-            {"service_name": "user", "method_name": "list_users", "params": "[1,2]"},
+            {"service_name": "UserService", "method_name": "list_users", "params": "[1,2]"},
         )
         data = json.loads(result.content[0].text)
         assert data["success"] is False
@@ -415,7 +402,7 @@ class TestRpcMcpServer:
         result = await mcp_server.call_tool(
             "call_rpc",
             {
-                "service_name": "user",
+                "service_name": "UserService",
                 "method_name": "get_user",
                 "params": json.dumps({"wrong_param": 1}),
             },

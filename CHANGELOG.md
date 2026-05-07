@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.4.0
+
+### Breaking Change: Remove `RpcServiceConfig`
+
+`RpcServiceConfig` TypedDict is removed. `create_rpc_mcp_server` and `create_rpc_voyager` now accept a plain list of `RpcService` subclasses instead of config dicts.
+
+- Service name is derived from `cls.__name__` (e.g. `TaskService` → `"TaskService"`)
+- Service description is derived from `cls.__doc__`
+
+**Migration:**
+
+```python
+# Before
+from sqlmodel_nexus import RpcServiceConfig, create_rpc_mcp_server
+
+mcp = create_rpc_mcp_server(
+    services=[
+        RpcServiceConfig(name="task", service=TaskService, description="..."),
+        RpcServiceConfig(name="sprint", service=SprintService, description="..."),
+    ],
+)
+
+# After
+from sqlmodel_nexus import create_rpc_mcp_server
+
+mcp = create_rpc_mcp_server(
+    services=[TaskService, SprintService],
+)
+```
+
 ## 1.3.3
 
 ### Breaking Change: Remove `Loader(str)` Support

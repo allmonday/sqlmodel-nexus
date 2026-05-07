@@ -363,20 +363,17 @@ class ServiceIntrospector:
     - ``get_service()``: direct access to the service class
     """
 
-    def __init__(self, configs: list[dict[str, Any]]):
-        """Initialize with a list of RpcServiceConfig dicts.
+    def __init__(self, services: list[type[RpcService]]):
+        """Initialize with a list of RpcService subclasses.
 
         Args:
-            configs: Each must have ``name`` and ``service`` keys.
+            services: Each must be a subclass of RpcService.
         """
         self._services: dict[str, type[RpcService]] = {}
-        self._descriptions: dict[str, str | None] = {}
 
-        for config in configs:
-            name = config["name"]
-            service = config["service"]
+        for service in services:
+            name = service.__name__
             self._services[name] = service
-            self._descriptions[name] = config.get("description")
 
     def list_services(self) -> list[dict[str, Any]]:
         """Return lightweight service listing.
@@ -389,8 +386,7 @@ class ServiceIntrospector:
             result.append(
                 {
                     "name": name,
-                    "description": self._descriptions.get(name)
-                    or service_cls.__doc__,
+                    "description": service_cls.__doc__,
                     "methods_count": len(getattr(service_cls, RPC_METHODS_ATTR)),
                 }
             )
@@ -448,7 +444,7 @@ class ServiceIntrospector:
 
         return {
             "name": name,
-            "description": self._descriptions.get(name) or service_cls.__doc__,
+            "description": service_cls.__doc__,
             "methods": clean_methods,
             "types": types_str,
         }
